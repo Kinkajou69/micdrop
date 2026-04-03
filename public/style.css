@@ -17,12 +17,18 @@
 body {
     margin: 0;
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    height: 100vh;
+
+    /* Mobile viewport stability */
+    min-height: 100svh;
+    min-height: 100dvh;
+
     display: flex;
     justify-content: center;
     align-items: center;
+
     color: var(--text);
-    overflow: hidden;
+
+    overflow-x: hidden;
 }
 
 /* --- WebGL background layers --- */
@@ -30,7 +36,11 @@ body {
     position: fixed;
     inset: 0;
     z-index: 0;
-    background: url('micdropbackground.jpg') center/cover no-repeat;
+
+    background: url('micdropbackground.jpg') center / cover no-repeat;
+
+    /* GPU stabilization */
+    transform: translateZ(0);
 }
 
 #gl {
@@ -38,17 +48,20 @@ body {
     inset: 0;
     z-index: 1;
     pointer-events: none;
+
+    /* prevents compositing jitter on mobile */
+    transform: translateZ(0);
 }
 
-/* --- Glass container: transparent so WebGL shader shows through --- */
+/* --- Glass container --- */
 .glass-container {
     position: relative;
     z-index: 2;
-    /* Completely transparent bg — WebGL draws the glass behind this */
+
     background: transparent;
 
-    /* Just a whisper of a border to define the edge */
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    /* edge definition */
+    border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 28px;
 
     padding: 3rem;
@@ -56,13 +69,24 @@ body {
     max-width: 420px;
     text-align: center;
 
-    /* Subtle top highlight to sell the glass edge */
+    /* stabilize on mobile GPU */
+    transform: translateZ(0);
+    will-change: transform;
+
+    /* enhances perceived refraction thickness */
+    backdrop-filter: saturate(140%);
+    -webkit-backdrop-filter: saturate(140%);
+
+    /* glass depth */
     box-shadow:
-        inset 0 1.5px 0 rgba(255, 255, 255, 0.3),
-        inset 1px 0 0 rgba(255, 255, 255, 0.08);
+        inset 0 1.5px 0 rgba(255,255,255,0.35),
+        inset 1px 0 0 rgba(255,255,255,0.08),
+        0 8px 40px rgba(0,0,0,0.35);
 }
 
-.hidden { display: none !important; }
+.hidden {
+    display: none !important;
+}
 
 h1 {
     margin-top: 0;
@@ -72,7 +96,10 @@ h1 {
     letter-spacing: 6px;
     font-size: 2rem;
     color: white;
-    text-shadow: 0 0 30px rgba(0, 229, 255, 0.6), 0 2px 8px rgba(0,0,0,0.4);
+
+    text-shadow:
+        0 0 30px rgba(0, 229, 255, 0.6),
+        0 2px 8px rgba(0,0,0,0.4);
 }
 
 h3 {
@@ -83,7 +110,9 @@ h3 {
     letter-spacing: 2px;
     color: white;
     opacity: 0.7;
-    text-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+
+    text-shadow:
+        0 0 20px rgba(0, 229, 255, 0.4);
 }
 
 /* Inputs */
@@ -91,13 +120,16 @@ input {
     width: 100%;
     padding: 14px 16px;
     margin: 10px 0;
+
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.15);
+
     background: rgba(0, 0, 0, 0.25);
+
     color: white;
     font-size: 1rem;
     font-family: "Inter", sans-serif;
-    box-sizing: border-box;
+
     transition: all 0.3s ease;
 }
 
@@ -107,9 +139,13 @@ input::placeholder {
 
 input:focus {
     outline: none;
+
     background: rgba(0, 0, 0, 0.35);
+
     border-color: rgba(0, 229, 255, 0.5);
-    box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+
+    box-shadow:
+        0 0 20px rgba(0, 229, 255, 0.15);
 }
 
 /* Buttons */
@@ -117,75 +153,120 @@ button {
     width: 100%;
     padding: 14px;
     margin: 8px 0;
+
     border: none;
     border-radius: 14px;
+
     font-family: "Inter", sans-serif;
     font-weight: 700;
     font-size: 0.85rem;
+
     text-transform: uppercase;
     letter-spacing: 1.5px;
+
     cursor: pointer;
+
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-button:active { transform: scale(0.96); }
+button:active {
+    transform: scale(0.96);
+}
 
+/* Primary */
 .primary-btn {
-    background: linear-gradient(135deg, var(--cyan), #0099cc);
+    background: linear-gradient(
+        135deg,
+        var(--cyan),
+        #0099cc
+    );
+
     color: #000000;
+
     box-shadow:
         0 4px 24px rgba(0, 229, 255, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .primary-btn:hover {
-    box-shadow: 0 6px 32px rgba(0, 229, 255, 0.5);
     transform: translateY(-2px);
+
+    box-shadow:
+        0 6px 32px rgba(0, 229, 255, 0.55),
+        0 0 18px rgba(0,229,255,0.35);
 }
 
+/* Secondary */
 .secondary-btn {
     background: rgba(0, 0, 0, 0.2);
+
     color: white;
+
     border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .secondary-btn:hover {
     background: rgba(0, 0, 0, 0.3);
+
     border-color: rgba(0, 229, 255, 0.25);
 }
 
+/* Danger */
 .danger-btn {
-    background: linear-gradient(135deg, var(--danger), #cc0033);
+    background: linear-gradient(
+        135deg,
+        var(--danger),
+        #cc0033
+    );
+
     color: white;
+
     box-shadow:
         0 4px 20px rgba(255, 59, 107, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .danger-btn:hover {
-    box-shadow: 0 6px 28px rgba(255, 59, 107, 0.5);
     transform: translateY(-2px);
+
+    box-shadow:
+        0 6px 28px rgba(255, 59, 107, 0.55);
 }
 
+/* subtle text button */
 .text-btn {
     background: transparent;
+
     color: white;
-    opacity: 0.4;
+
+    opacity: 0.45;
+
     font-size: 0.8rem;
 }
 
-.text-btn:hover { opacity: 0.8; }
+.text-btn:hover {
+    opacity: 0.85;
+}
 
 /* Attendee list */
 .list-container {
     max-height: 300px;
     overflow-y: auto;
+
     margin-top: 1.5rem;
 }
 
-.list-container::-webkit-scrollbar { width: 4px; }
-.list-container::-webkit-scrollbar-track { background: transparent; }
+.list-container::-webkit-scrollbar {
+    width: 4px;
+}
+
+.list-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
 .list-container::-webkit-scrollbar-thumb {
     background: rgba(0, 229, 255, 0.3);
     border-radius: 2px;
@@ -193,48 +274,76 @@ button:active { transform: scale(0.96); }
 
 .attendee-item {
     background: rgba(0, 0, 0, 0.2);
+
     padding: 12px 18px;
+
     margin-bottom: 10px;
+
     border-radius: 14px;
+
     display: flex;
     justify-content: space-between;
     align-items: center;
+
     border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
     transition: all 0.3s ease;
 }
 
 .attendee-item.hand-raised {
     background: rgba(0, 229, 160, 0.1);
+
     border: 1px solid rgba(0, 229, 160, 0.4);
-    box-shadow: 0 0 20px rgba(0, 229, 160, 0.1);
+
+    box-shadow:
+        0 0 20px rgba(0, 229, 160, 0.1);
 }
 
 /* Status bar */
 #status-bar {
     position: fixed;
+
     top: 20px;
     left: 50%;
-    transform: translateX(-50%);
+
+    transform: translateX(-50%) translateZ(0);
+
     background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(20px);
+
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+
     border: 1px solid rgba(255, 255, 255, 0.15);
+
     border-radius: 100px;
+
     padding: 8px 24px;
+
     font-size: 0.75rem;
+
     letter-spacing: 1.5px;
     text-transform: uppercase;
+
     color: rgba(255,255,255,0.7);
+
     z-index: 100;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 /* Audio gate overlay */
 #audio-gate {
     position: fixed;
     inset: 0;
+
     background: rgba(0,0,0,0.6);
+
     z-index: 9999;
+
     display: flex;
     align-items: center;
     justify-content: center;
@@ -242,12 +351,24 @@ button:active { transform: scale(0.96); }
 
 .glass-card {
     background: rgba(0,0,0,0.3);
+
     border: 1px solid rgba(255,255,255,0.15);
+
     border-radius: 20px;
+
     padding: 2rem;
+
     text-align: center;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.2),
+        0 8px 40px rgba(0,0,0,0.35);
 }
 
-/* Kill the orbs, bg handles it */
-.bg-orb { display: none; }
+/* Kill orbs */
+.bg-orb {
+    display: none;
+}
