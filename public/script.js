@@ -170,23 +170,28 @@ socket.on('mic_approved', async (data) => {
         }
 
         // Pick a supported MIME type
-        const mimeType = getSupportedMimeType();
-        console.log("Recording with:", mimeType);
+        const senderContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+const source = senderContext.createMediaStreamSource(localStream);
+const processor = senderContext.createScriptProcessor(4096, 1, 1);
 
-        mediaRecorder = new MediaRecorder(localStream, { mimeType });
+source.connect(processor);
+processor.connect(senderContext.destination);
 
-        mediaRecorder.ondataavailable = (event) => {
-            if (event.data && event.data.size > 0) {
-                // Send the audio chunk + mimeType so the moderator knows how to decode it
-                event.data.arrayBuffer().then(buffer => {
-                    socket.emit('audio_chunk', {
-                        targetId: currentModeratorId,
-                        buffer: buffer,
-                        mimeType: mimeType
-                    });
-                });
-            }
-        };
+processor.onaudioprocess = (e) => {
+    const float32 = e.inputBuffer.getChannelData(0);
+    const int16 = new Int16Array(float32.length);
+    for (let i = 0; i < float32.length; i++) {
+        int16[i] = Math.max(-32768, Math.min(32767, float32[i] * 32768));
+    }
+    socket.emit('audio_chunk', {
+        targetId: currentModeratorId,
+        buffer: int16.buffer,
+        sampleRate: 16000
+    });
+};
+
+mediaRecorder = { stop: () => { processor.disconnect(); source.disconnect(); senderContext.close(); } };
+console.log("PCM streaming started ✅");
 
         // Fire every 250ms — low latency chunks
         mediaRecorder.start(250);
@@ -202,17 +207,17 @@ socket.on('mic_approved', async (data) => {
 // MODERATOR: Receive and play audio chunks
 socket.on('audio_chunk', async (data) => {
     if (myRole !== 'moderator') return;
-
-    // Show the gate if AudioContext isn't unlocked yet
     if (!audioContext || audioContext.state === 'suspended') {
         if (audioGate) audioGate.classList.remove('hidden');
         return;
     }
-
-    // Decode and queue the chunk
     try {
-        const arrayBuffer = data.buffer;
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        const int16 = new Int16Array(data.buffer);
+        const audioBuffer = audioContext.createBuffer(1, int16.length, data.sampleRate);
+        const channel = audioBuffer.getChannelData(0);
+        for (let i = 0; i < int16.length; i++) {
+            channel[i] = int16[i] / 32768;
+        }
         audioQueue.push(audioBuffer);
         if (!isPlaying) playNextChunk();
     } catch (err) {
