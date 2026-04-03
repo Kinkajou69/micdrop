@@ -9,6 +9,17 @@
     --text: #ffffff;
 }
 
+/* --- EMERGENCY UTILITY FIXES --- */
+.hidden {
+    display: none !important;
+}
+
+.view {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 /* --- Animations --- */
 @keyframes slickBounce {
     0% { transform: scale(1); }
@@ -33,22 +44,31 @@ body {
     overflow: hidden;
 }
 
-#bg { position: fixed; inset: 0; z-index: 0; background: url('micdropbackground.jpg') center / cover; filter: brightness(0.4); }
-#gl { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+#bg { position: fixed; inset: 0; z-index: 0 !important; background: url('micdropbackground.jpg') center / cover; filter: brightness(0.4); }
+#gl { position: fixed; inset: 0; z-index: 0 !important; pointer-events: none; }
 
+/* --- Restored Glass Effect --- */
 .glass-container {
     position: relative;
-    z-index: 2;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--carbon);
+    z-index: 10 !important;
+    pointer-events: auto !important;
+    
+    background: transparent; 
+    
+    border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 28px;
     padding: 3rem;
     width: 90%;
-    max-width: 400px;
+    max-width: 420px;
     text-align: center;
-    backdrop-filter: blur(40px) saturate(160%);
-    -webkit-backdrop-filter: blur(40px) saturate(160%);
-    box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.1);
+    
+    backdrop-filter: saturate(140%);
+    -webkit-backdrop-filter: saturate(140%);
+    
+    box-shadow:
+        inset 0 1.5px 0 rgba(255,255,255,0.35),
+        inset 1px 0 0 rgba(255,255,255,0.08),
+        0 8px 40px rgba(0,0,0,0.35);
 }
 
 h1 { font-family: "Rajdhani"; letter-spacing: 8px; text-shadow: 0 0 20px var(--cyan); margin-bottom: 2rem; }
