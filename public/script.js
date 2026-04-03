@@ -18,6 +18,8 @@ const views = {
 const statusText = document.getElementById('attendee-status-text');
 const btnRaise = document.getElementById('btn-raise-hand');
 const btnStop = document.getElementById('btn-stop-talking');
+const audioGate = document.getElementById('audio-gate');
+const unlockBtn = document.getElementById('btn-unlock-audio');
 
 // --- Navigation Helpers ---
 function showView(viewName) {
@@ -142,7 +144,7 @@ const rtcConfig = {
             credential: '2A/89f+0R1p89j0A'
         }
     ],
-    iceCandidatePoolSize: 10 // This helps mobile devices find paths faster
+    iceCandidatePoolSize: 10 
 };
 
 function resetConnection() {
@@ -206,26 +208,23 @@ socket.on('signal', async (data) => {
         myPeerConnection.ontrack = (event) => {
             const audioEl = document.getElementById('remote-audio');
             
-            // MOBILE FIX: Force attributes before assigning stream
             audioEl.setAttribute('autoplay', 'true');
             audioEl.setAttribute('playsinline', 'true');
             audioEl.muted = false;      
             audioEl.srcObject = event.streams[0];
             
-            // Interaction trigger
-            const handleInteraction = () => {
-                audioEl.play().then(() => {
-                    console.log("Audio playing successfully!");
-                    document.removeEventListener('click', handleInteraction);
-                }).catch(e => console.warn("Retry failed", e));
-            };
-
-            document.addEventListener('click', handleInteraction);
-            
-            // Auto-attempt
-            audioEl.play().catch(error => {
-                console.warn("Autoplay blocked. User needs to click.");
-                statusText.innerText = "⚠️ CLICK SCREEN TO ENABLE AUDIO";
+            // Try Autoplay
+            audioEl.play().then(() => {
+                console.log("Audio playing successfully!");
+            }).catch(error => {
+                console.warn("Autoplay blocked. Showing Gate.");
+                audioGate.classList.remove('hidden');
+                
+                unlockBtn.onclick = () => {
+                    audioEl.play().then(() => {
+                        audioGate.classList.add('hidden');
+                    });
+                };
             });
         };
 
