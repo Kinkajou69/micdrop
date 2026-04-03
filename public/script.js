@@ -170,6 +170,36 @@ socket.on('joined_success', (data) => {
     showView('attendee');
 });
 
+// --- Moderator UI: Update Attendees ---
+socket.on('update_attendees', (attendees) => {
+    if (myRole !== 'moderator') return;
+    const list = document.getElementById('attendee-list');
+    list.innerHTML = '';
+    attendees.sort((a, b) => (b.handRaised === true) - (a.handRaised === true));
+    attendees.forEach(att => {
+        const div = document.createElement('div');
+        div.className = `attendee-item ${att.handRaised ? 'hand-raised' : ''}`;
+        let controls = att.handRaised
+            ? `<div class="mod-controls">
+                <button class="primary-btn" onclick="approveSpeaker('${att.id}')">✅ Speak</button>
+                <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">❌ Deny</button>
+               </div>`
+            : `<span style="font-size:0.8rem; opacity:0.6; margin-right:10px">Listening</span>`;
+        div.innerHTML = `<span>${att.name}</span>${controls}`;
+        list.appendChild(div);
+    });
+});
+
+window.approveSpeaker = (id) => {
+    audioQueue = [];
+    isPlaying = false;
+    socket.emit('moderator_action', { action: 'approve', targetId: id, code: currentRoom });
+};
+
+window.rejectSpeaker = (id) => {
+    socket.emit('moderator_action', { action: 'reject', targetId: id, code: currentRoom });
+};
+
 // --- PCM Audio Streaming Logic (Restored) ---
 
 socket.on('mic_approved', async (data) => {
