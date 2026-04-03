@@ -33,13 +33,11 @@ io.on('connection', (socket) => {
         if (room) {
             socket.join(code);
             room.attendees.push({ id: socket.id, name: name, handRaised: false });
-
             socket.emit('joined_success', {
                 name,
                 code,
                 moderatorId: room.moderatorId
             });
-
             io.to(room.moderatorId).emit('update_attendees', room.attendees);
         } else {
             socket.emit('error_msg', 'Invalid Conference Code');
@@ -77,6 +75,8 @@ io.on('connection', (socket) => {
         if (!room) return;
 
         if (action === 'reject') {
+            // Tell the attendee to stop their mic AND reset their hand
+            io.to(targetId).emit('mic_stopped');
             io.to(targetId).emit('hand_rejected');
             const attendee = room.attendees.find(a => a.id === targetId);
             if (attendee) attendee.handRaised = false;
@@ -93,15 +93,16 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- Audio Chunk Relay (replaces WebRTC signaling) ---
+    // --- Audio Chunk Relay ---
+
     socket.on('audio_chunk', (data) => {
         io.to(data.targetId).emit('audio_chunk', {
-            buffer: data.buffer,
-            mimeType: data.mimeType
+            buffer: data.buffer
         });
     });
 
     // --- Disconnect ---
+
     socket.on('disconnect', () => {
         for (const code in rooms) {
             const room = rooms[code];
