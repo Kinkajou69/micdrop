@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Inter:wght@400;500;700&display=swap');
 
 :root {
-    --cyan: #00d4ff;
+    --cyan: #e65c00;
     --dark-grey: #1a1a1a;
     --carbon: rgba(255, 255, 255, 0.08);
     --danger: #ff3b6b;
@@ -21,7 +21,12 @@
 }
 .bouncy-active { animation: slickBounce 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 
-* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
 
 body {
     min-height: 100dvh;
@@ -34,8 +39,19 @@ body {
     overflow: hidden;
 }
 
-#bg { position: fixed; inset: 0; z-index: 0; background: url('micdropbackground.jpg') center / cover; filter: brightness(0.9); }
-#gl { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+#bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: url('micdropbackground.jpg') center / cover;
+    filter: brightness(0.9);
+}
+#gl {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+}
 
 .glass-container {
     position: relative;
@@ -52,7 +68,13 @@ body {
     box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.3), 0 8px 40px rgba(0,0,0,0.4);
 }
 
-h1 { font-family: "Rajdhani"; letter-spacing: 8px; text-transform: uppercase; text-shadow: 0 0 20px var(--cyan); margin-bottom: 1rem; }
+h1 {
+    font-family: "Rajdhani";
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px var(--cyan);
+    margin-bottom: 1rem;
+}
 
 /* --- FIXED: THE STATUS BAR --- */
 #status-bar {
@@ -95,9 +117,9 @@ h1 { font-family: "Rajdhani"; letter-spacing: 8px; text-transform: uppercase; te
 }
 
 .attendee-item.hand-raised {
-    background: rgba(0, 212, 255, 0.15);
+    background: rgba(230, 92, 0, 0.15);
     border-color: var(--cyan);
-    box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+    box-shadow: 0 0 15px rgba(230, 92, 0, 0.2);
 }
 
 .mod-controls {
@@ -118,27 +140,54 @@ h1 { font-family: "Rajdhani"; letter-spacing: 8px; text-transform: uppercase; te
 .hamburger-bar { width: 22px; height: 2px; background: #fff; margin: 5px 0; border-radius: 2px; }
 
 .glass-nav {
-    position: fixed; top: 0; right: -300px; width: 280px; height: 100vh;
-    background: rgba(0,0,0,0.75); backdrop-filter: blur(30px); border-left: 1px solid var(--carbon); 
-    z-index: 999; padding: 80px 30px; transition: 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+    position: fixed;
+    top: 0;
+    right: -300px;
+    width: 280px;
+    height: 100vh;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(30px);
+    border-left: 1px solid var(--carbon);
+    z-index: 999;
+    padding: 80px 30px;
+    transition: 0.5s cubic-bezier(0.19, 1, 0.22, 1);
 }
 .glass-nav.active { right: 0; }
 
 .mic-status-pill {
-    display: flex; align-items: center; gap: 12px; padding: 12px;
-    background: rgba(255,255,255,0.05); border-radius: 12px; margin-top: 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    margin-top: 15px;
 }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
 .mic-on .status-dot { background: var(--success); box-shadow: 0 0 10px var(--success); }
 
-button { width: 100%; padding: 16px; border: none; border-radius: 16px; font-weight: 700; text-transform: uppercase; cursor: pointer; }
-.primary-btn { background: var(--cyan); color: #000; box-shadow: 0 8px 20px rgba(0, 212, 255, 0.2); }
+button {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 16px;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+.primary-btn { background: var(--cyan); color: #000; box-shadow: 0 8px 20px rgba(230, 92, 0, 0.2); }
 .secondary-btn { background: rgba(0,0,0,0.3); color: #fff; border: 1px solid var(--carbon); }
 .danger-btn { background: var(--danger); color: #fff; }
 .text-btn { background: transparent; color: #fff; opacity: 0.5; }
 
 input {
-    width: 100%; padding: 16px; margin-bottom: 15px; background: rgba(0,0,0,0.3);
-    border: 1px solid var(--carbon); border-radius: 14px; color: #fff; outline: none;
+    width: 100%;
+    padding: 16px;
+    margin-bottom: 15px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--carbon);
+    border-radius: 14px;
+    color: #fff;
+    outline: none;
 }
 input:focus { border-color: var(--cyan); }

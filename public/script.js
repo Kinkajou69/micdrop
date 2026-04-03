@@ -279,3 +279,14 @@ socket.on('hand_rejected', () => {
     btnRaise.classList.remove('hidden');
     btnStop.classList.add('hidden');
 });
+
+// --- Attendee Controls ---
+btnRaise.onclick = () => {
+    socket.emit('raise_hand', currentRoom);
+    statusText.innerText = "Hand raised! Waiting for host...";
+    btnRaise.classList.add('hidden');
+};
+
+btnStop.onclick = () => {
+    stopStreaming();
+};
