@@ -28,24 +28,21 @@ function showView(viewName) {
 }
 
 // --- MOBILE "WARM UP" FUNCTION ---
-// This forces the phone to unlock the hardware before any socket logic starts
 async function warmUpAudio() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Keep the stream alive so the phone knows we are "Active"
         localStream = stream; 
         console.log("Hardware Unlocked 🎙️");
         return true;
     } catch (err) {
         console.error("Hardware Unlock Failed:", err);
-        alert("Microphone access is REQUIRED for this app to work on mobile. Please check your settings.");
+        alert("Microphone access is REQUIRED. Please check settings.");
         return false;
     }
 }
 
 // --- Button Listeners ---
 
-// MODIFIED: Host now "Warms up" their mic too, otherwise they can't hear others!
 document.getElementById('btn-start').onclick = async () => {
     const ready = await warmUpAudio();
     if(ready) socket.emit('create_room');
@@ -54,7 +51,6 @@ document.getElementById('btn-start').onclick = async () => {
 document.getElementById('btn-join').onclick = () => showView('join');
 document.getElementById('btn-back').onclick = () => showView('landing');
 
-// MODIFIED: Guests "Warm up" as they enter the room
 document.getElementById('btn-enter').onclick = async () => {
     const name = document.getElementById('input-name').value;
     const code = document.getElementById('input-code').value.toUpperCase();
@@ -72,7 +68,6 @@ socket.on('room_created', (code) => {
     myRole = 'moderator';
     currentRoom = code;
     currentModeratorId = socket.id; 
-    
     document.getElementById('room-display').innerText = code;
     document.getElementById('role-display').innerText = 'HOST';
     document.getElementById('status-bar').classList.remove('hidden');
@@ -83,7 +78,6 @@ socket.on('joined_success', (data) => {
     myRole = 'attendee';
     currentRoom = data.code;
     currentModeratorId = data.moderatorId;
-    
     document.getElementById('room-display').innerText = data.code;
     document.getElementById('role-display').innerText = data.name;
     document.getElementById('status-bar').classList.remove('hidden');
@@ -99,28 +93,18 @@ socket.on('error_msg', (msg) => {
 
 socket.on('update_attendees', (attendees) => {
     if(myRole !== 'moderator') return;
-    
     const list = document.getElementById('attendee-list');
     list.innerHTML = '';
-    
     attendees.sort((a, b) => (b.handRaised === true) - (a.handRaised === true));
-
     attendees.forEach(att => {
         const div = document.createElement('div');
         div.className = `attendee-item ${att.handRaised ? 'hand-raised' : ''}`;
-        
-        let controls = '';
-        if(att.handRaised) {
-            controls = `
-                <div class="mod-controls">
-                    <button class="primary-btn" onclick="approveSpeaker('${att.id}')">✅ Speak</button>
-                    <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">❌ Deny</button>
-                </div>
-            `;
-        } else {
-             controls = `<span style="font-size:0.8rem; opacity:0.6; margin-right:10px">Listening</span>`;
-        }
-
+        let controls = att.handRaised ? `
+            <div class="mod-controls">
+                <button class="primary-btn" onclick="approveSpeaker('${att.id}')">✅ Speak</button>
+                <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">❌ Deny</button>
+            </div>
+        ` : `<span style="font-size:0.8rem; opacity:0.6; margin-right:10px">Listening</span>`;
         div.innerHTML = `<span>${att.name}</span>${controls}`;
         list.appendChild(div);
     });
@@ -141,7 +125,6 @@ window.rejectSpeaker = (id) => {
 // --- ATTENDEE UI LOGIC ---
 
 btnRaise.onclick = () => {
-    // We already warmed up the mic in btn-enter, so we just emit the event
     socket.emit('raise_hand', currentRoom);
     statusText.innerText = "Hand Raised! Waiting for host...";
     btnRaise.classList.add('hidden');
@@ -153,7 +136,6 @@ btnStop.onclick = () => {
 
 socket.on('hand_rejected', () => {
     statusText.innerText = "Host declined. Try again later.";
-    localStorage.setItem('micdrop_reject_time', Date.now());
     btnRaise.classList.remove('hidden');
     btnStop.classList.add('hidden'); 
 });
@@ -163,25 +145,17 @@ socket.on('hand_rejected', () => {
 const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        // This is a more robust public TURN server that works on most restricted networks
         {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-        },
-        {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-        },
-        {
-            urls: 'turn:openrelay.metered.ca:3478',
+            urls: [
+                'turn:openrelay.metered.ca:443?transport=tcp', 
+                'turn:openrelay.metered.ca:443?transport=udp',
+                'turn:openrelay.metered.ca:80?transport=tcp'
+            ],
             username: 'openrelayproject',
             credential: 'openrelayproject'
         }
     ],
-    iceTransportPolicy: 'relay', // FORCED RELAY: This tells the app "Don't even try to talk directly, just use the TURN server."
+    iceTransportPolicy: 'relay', 
     iceCandidatePoolSize: 10 
 };
 
@@ -190,22 +164,18 @@ function resetConnection() {
         myPeerConnection.close();
         myPeerConnection = null;
     }
-    // We DON'T stop localStream here on mobile, otherwise we lose the "warm up"
 }
 
 // 1. ATTENDEE: Approved
 socket.on('mic_approved', async (data) => {
     if(data.moderatorId) currentModeratorId = data.moderatorId;
-
     statusText.innerText = "You are LIVE! 🎙️";
     btnStop.classList.remove('hidden');
     
     try {
-        // Reuse the stream we got during "btn-enter"
         if (!localStream || !localStream.active) {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
-        
         myPeerConnection = new RTCPeerConnection(rtcConfig);
         localStream.getTracks().forEach(track => myPeerConnection.addTrack(track, localStream));
 
@@ -221,16 +191,14 @@ socket.on('mic_approved', async (data) => {
 
         const offer = await myPeerConnection.createOffer();
         await myPeerConnection.setLocalDescription(offer);
-        
         socket.emit('signal', {
             target: currentModeratorId,
             type: 'offer',
             payload: offer
         });
-        
     } catch (err) {
         console.error("WebRTC Error:", err);
-        alert("Connection failed. Try refreshing.");
+        alert("Connection failed.");
         stopStreaming();
     }
 });
@@ -238,28 +206,26 @@ socket.on('mic_approved', async (data) => {
 // 2. MODERATOR: Incoming Call (Offer)
 socket.on('signal', async (data) => {
     if(myRole === 'moderator' && data.type === 'offer') {
-        
         if (myPeerConnection) myPeerConnection.close();
         myPeerConnection = new RTCPeerConnection(rtcConfig);
         
         myPeerConnection.ontrack = (event) => {
             const audioEl = document.getElementById('remote-audio');
-            
-            audioEl.setAttribute('autoplay', 'true');
-            audioEl.setAttribute('playsinline', 'true');
-            audioEl.muted = false;      
+            console.log("Track received! Setting up audio...");
+
             audioEl.srcObject = event.streams[0];
+            audioEl.autoplay = true;
+            audioEl.muted = false;
+            audioEl.volume = 1.0;
             
             audioEl.play().then(() => {
-                console.log("Streaming Audio!");
+                console.log("AUDIO IS PLAYING! 🎙️");
+                audioGate.classList.add('hidden');
             }).catch(error => {
                 console.warn("Autoplay blocked. Showing Gate.");
                 audioGate.classList.remove('hidden');
-                
                 unlockBtn.onclick = () => {
-                    audioEl.play().then(() => {
-                        audioGate.classList.add('hidden');
-                    });
+                    audioEl.play().then(() => audioGate.classList.add('hidden'));
                 };
             });
         };
@@ -277,13 +243,11 @@ socket.on('signal', async (data) => {
         await myPeerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
         const answer = await myPeerConnection.createAnswer();
         await myPeerConnection.setLocalDescription(answer);
-        
         socket.emit('signal', {
             target: data.sender,
             type: 'answer',
             payload: answer
         });
-        
     } 
     else if (data.type === 'answer' && myPeerConnection) {
         await myPeerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
@@ -305,7 +269,6 @@ function stopStreaming() {
         myPeerConnection.close();
         myPeerConnection = null;
     }
-    // We keep the localStream active so the "Warm Up" persists for the next use!
     socket.emit('lower_hand', currentRoom);
     btnStop.classList.add('hidden');
     btnRaise.classList.remove('hidden');
