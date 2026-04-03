@@ -65,17 +65,16 @@ body {
 .hidden { display: none !important; }
 
 h1 {
+    h1 {
     margin-top: 0;
     font-family: "Rajdhani", sans-serif;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 6px;
     font-size: 2rem;
-    background: linear-gradient(90deg, var(--cyan), var(--magenta));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.4));
+    color: white;
+    text-shadow: 0 0 30px rgba(0, 229, 255, 0.6), 0 2px 8px rgba(0,0,0,0.4);
+}
 }
 
 h3 {
@@ -84,8 +83,9 @@ h3 {
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 2px;
-    opacity: 0.5;
-    color: var(--cyan);
+    color: white;
+    opacity: 0.7;
+    text-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
 }
 
 /* Inputs */
