@@ -162,13 +162,22 @@ socket.on('hand_rejected', () => {
 
 const rtcConfig = {
     iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        // Fresh TURN relay (This is the "middleman" that fixes the 5G-to-WiFi jump)
         {
-            urls: 'turn:global.relay.metered.ca:443',
-            username: '83f5383f945199659b85290b',
-            credential: '2A/89f+0R1p89j0A'
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
         }
     ],
+    iceTransportPolicy: 'all',
     iceCandidatePoolSize: 10 
 };
 
