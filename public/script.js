@@ -139,14 +139,19 @@ const rtcConfig = {
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         {
-            urls: 'turn:relay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:global.relay.metered.ca:80',
+            username: '83f5383f945199659b85290b',
+            credential: '2A/89f+0R1p89j0A'
         },
         {
-            urls: 'turn:relay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:global.relay.metered.ca:443',
+            username: '83f5383f945199659b85290b',
+            credential: '2A/89f+0R1p89j0A'
+        },
+        {
+            urls: 'turn:global.relay.metered.ca:443?transport=tcp',
+            username: '83f5383f945199659b85290b',
+            credential: '2A/89f+0R1p89j0A'
         }
     ]
 };
