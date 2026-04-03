@@ -14,9 +14,9 @@ function generateCode() {
 }
 
 io.on('connection', (socket) => {
-    
+
     // --- Room Management ---
-    
+
     socket.on('create_room', () => {
         const code = generateCode();
         rooms[code] = {
@@ -26,20 +26,20 @@ io.on('connection', (socket) => {
         socket.join(code);
         socket.emit('room_created', code);
         console.log(`Room created: ${code} by ${socket.id}`);
-    });  
+    });
 
     socket.on('join_room', ({ code, name }) => {
         const room = rooms[code];
         if (room) {
             socket.join(code);
             room.attendees.push({ id: socket.id, name: name, handRaised: false });
-            
-            socket.emit('joined_success', { 
-                name, 
-                code, 
-                moderatorId: room.moderatorId 
+
+            socket.emit('joined_success', {
+                name,
+                code,
+                moderatorId: room.moderatorId
             });
-            
+
             io.to(room.moderatorId).emit('update_attendees', room.attendees);
         } else {
             socket.emit('error_msg', 'Invalid Conference Code');
@@ -77,35 +77,31 @@ io.on('connection', (socket) => {
         if (!room) return;
 
         if (action === 'reject') {
-            // Signal the attendee to stop their hand/mic
             io.to(targetId).emit('hand_rejected');
-            
             const attendee = room.attendees.find(a => a.id === targetId);
-            if(attendee) attendee.handRaised = false;
+            if (attendee) attendee.handRaised = false;
             io.to(room.moderatorId).emit('update_attendees', room.attendees);
-        } 
+        }
         else if (action === 'approve') {
             io.to(targetId).emit('mic_approved', { moderatorId: room.moderatorId });
         }
         else if (action === 'stop') {
-            // Signal the attendee to forcefully shut down the hardware
             io.to(targetId).emit('mic_stopped');
-            
             const attendee = room.attendees.find(a => a.id === targetId);
-            if(attendee) attendee.handRaised = false;
+            if (attendee) attendee.handRaised = false;
             io.to(room.moderatorId).emit('update_attendees', room.attendees);
         }
     });
 
-    // --- WebRTC Signaling ---
-    socket.on('signal', (data) => {
-        io.to(data.target).emit('signal', {
-            sender: socket.id,
-            type: data.type,
-            payload: data.payload
+    // --- Audio Chunk Relay (replaces WebRTC signaling) ---
+    socket.on('audio_chunk', (data) => {
+        io.to(data.targetId).emit('audio_chunk', {
+            buffer: data.buffer,
+            mimeType: data.mimeType
         });
     });
 
+    // --- Disconnect ---
     socket.on('disconnect', () => {
         for (const code in rooms) {
             const room = rooms[code];

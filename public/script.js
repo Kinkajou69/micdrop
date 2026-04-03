@@ -3,9 +3,12 @@ const socket = io();
 // State
 let myRole = '';
 let currentRoom = '';
-let currentModeratorId = ''; 
-let myPeerConnection = null;
+let currentModeratorId = '';
 let localStream = null;
+let mediaRecorder = null;
+let audioQueue = [];
+let isPlaying = false;
+let audioContext = null;
 
 // DOM Elements
 const views = {
@@ -27,47 +30,65 @@ function showView(viewName) {
     views[viewName].classList.remove('hidden');
 }
 
-// --- MOBILE "WARM UP" FUNCTION ---
+// --- Audio Context Unlock (handles mobile autoplay policy) ---
+function unlockAudioContext() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+}
+
+// Attach unlock to the gate button
+if (unlockBtn) {
+    unlockBtn.onclick = () => {
+        unlockAudioContext();
+        if (audioGate) audioGate.classList.add('hidden');
+    };
+}
+
+// --- Mic Warm-Up ---
 async function warmUpAudio() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        localStream = stream; 
-        console.log("Hardware Unlocked 🎙️");
+        localStream = stream;
+        console.log("Mic access granted ✅");
         return true;
     } catch (err) {
-        console.error("Hardware Unlock Failed:", err);
-        alert("Microphone access is REQUIRED. Please check settings.");
+        console.error("Mic access denied:", err);
+        alert("Microphone access is required. Please allow it in your browser settings.");
         return false;
     }
 }
 
 // --- Button Listeners ---
-
 document.getElementById('btn-start').onclick = async () => {
+    unlockAudioContext();
     const ready = await warmUpAudio();
-    if(ready) socket.emit('create_room');
+    if (ready) socket.emit('create_room');
 };
 
 document.getElementById('btn-join').onclick = () => showView('join');
 document.getElementById('btn-back').onclick = () => showView('landing');
 
 document.getElementById('btn-enter').onclick = async () => {
-    const name = document.getElementById('input-name').value;
-    const code = document.getElementById('input-code').value.toUpperCase();
-    if(name && code) {
+    const name = document.getElementById('input-name').value.trim();
+    const code = document.getElementById('input-code').value.toUpperCase().trim();
+    if (name && code) {
+        unlockAudioContext();
         const ready = await warmUpAudio();
-        if(ready) socket.emit('join_room', { code, name });
+        if (ready) socket.emit('join_room', { code, name });
     } else {
-        alert("Please fill in both fields");
+        alert("Please fill in both fields.");
     }
 };
 
 // --- Socket Events: General ---
-
 socket.on('room_created', (code) => {
     myRole = 'moderator';
     currentRoom = code;
-    currentModeratorId = socket.id; 
+    currentModeratorId = socket.id;
     document.getElementById('room-display').innerText = code;
     document.getElementById('role-display').innerText = 'HOST';
     document.getElementById('status-bar').classList.remove('hidden');
@@ -86,35 +107,30 @@ socket.on('joined_success', (data) => {
 
 socket.on('error_msg', (msg) => {
     alert(msg);
-    location.reload(); 
+    location.reload();
 });
 
-// --- MODERATOR UI LOGIC ---
-
+// --- Moderator UI ---
 socket.on('update_attendees', (attendees) => {
-    if(myRole !== 'moderator') return;
+    if (myRole !== 'moderator') return;
     const list = document.getElementById('attendee-list');
     list.innerHTML = '';
     attendees.sort((a, b) => (b.handRaised === true) - (a.handRaised === true));
     attendees.forEach(att => {
         const div = document.createElement('div');
         div.className = `attendee-item ${att.handRaised ? 'hand-raised' : ''}`;
-        let controls = att.handRaised ? `
-            <div class="mod-controls">
+        let controls = att.handRaised
+            ? `<div class="mod-controls">
                 <button class="primary-btn" onclick="approveSpeaker('${att.id}')">✅ Speak</button>
                 <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">❌ Deny</button>
-            </div>
-        ` : `<span style="font-size:0.8rem; opacity:0.6; margin-right:10px">Listening</span>`;
+               </div>`
+            : `<span style="font-size:0.8rem; opacity:0.6; margin-right:10px">Listening</span>`;
         div.innerHTML = `<span>${att.name}</span>${controls}`;
         list.appendChild(div);
     });
 });
 
 window.approveSpeaker = (id) => {
-    if (myPeerConnection) {
-        myPeerConnection.close();
-        myPeerConnection = null;
-    }
     socket.emit('moderator_action', { action: 'approve', targetId: id, code: currentRoom });
 };
 
@@ -122,155 +138,132 @@ window.rejectSpeaker = (id) => {
     socket.emit('moderator_action', { action: 'reject', targetId: id, code: currentRoom });
 };
 
-// --- ATTENDEE UI LOGIC ---
-
+// --- Attendee UI ---
 btnRaise.onclick = () => {
     socket.emit('raise_hand', currentRoom);
-    statusText.innerText = "Hand Raised! Waiting for host...";
+    statusText.innerText = "Hand raised! Waiting for host...";
     btnRaise.classList.add('hidden');
 };
 
 btnStop.onclick = () => {
-    stopStreaming(); 
+    stopStreaming();
 };
 
 socket.on('hand_rejected', () => {
     statusText.innerText = "Host declined. Try again later.";
     btnRaise.classList.remove('hidden');
-    btnStop.classList.add('hidden'); 
+    btnStop.classList.add('hidden');
 });
 
-// --- WebRTC LOGIC ---
+// --- MediaRecorder Audio Streaming (replaces WebRTC) ---
 
-const rtcConfig = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        {
-            urls: [
-                'turn:openrelay.metered.ca:443?transport=tcp', 
-                'turn:openrelay.metered.ca:443?transport=udp',
-                'turn:openrelay.metered.ca:80?transport=tcp'
-            ],
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-        }
-    ],
-    iceTransportPolicy: 'relay', 
-    iceCandidatePoolSize: 10 
-};
-
-function resetConnection() {
-    if (myPeerConnection) {
-        myPeerConnection.close();
-        myPeerConnection = null;
-    }
-}
-
-// 1. ATTENDEE: Approved
+// ATTENDEE: Start streaming when approved
 socket.on('mic_approved', async (data) => {
-    if(data.moderatorId) currentModeratorId = data.moderatorId;
+    if (data.moderatorId) currentModeratorId = data.moderatorId;
     statusText.innerText = "You are LIVE! 🎙️";
     btnStop.classList.remove('hidden');
-    
+
     try {
         if (!localStream || !localStream.active) {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
-        myPeerConnection = new RTCPeerConnection(rtcConfig);
-        localStream.getTracks().forEach(track => myPeerConnection.addTrack(track, localStream));
 
-        myPeerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit('signal', {
-                    target: currentModeratorId, 
-                    type: 'candidate',
-                    payload: event.candidate
+        // Pick a supported MIME type
+        const mimeType = getSupportedMimeType();
+        console.log("Recording with:", mimeType);
+
+        mediaRecorder = new MediaRecorder(localStream, { mimeType });
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+                // Send the audio chunk + mimeType so the moderator knows how to decode it
+                event.data.arrayBuffer().then(buffer => {
+                    socket.emit('audio_chunk', {
+                        targetId: currentModeratorId,
+                        buffer: buffer,
+                        mimeType: mimeType
+                    });
                 });
             }
         };
 
-        const offer = await myPeerConnection.createOffer();
-        await myPeerConnection.setLocalDescription(offer);
-        socket.emit('signal', {
-            target: currentModeratorId,
-            type: 'offer',
-            payload: offer
-        });
+        // Fire every 250ms — low latency chunks
+        mediaRecorder.start(250);
+        console.log("MediaRecorder started ✅");
+
     } catch (err) {
-        console.error("WebRTC Error:", err);
-        alert("Connection failed.");
+        console.error("Streaming error:", err);
+        alert("Could not start audio stream.");
         stopStreaming();
     }
 });
 
-// 2. MODERATOR: Incoming Call (Offer)
-socket.on('signal', async (data) => {
-    if(myRole === 'moderator' && data.type === 'offer') {
-        if (myPeerConnection) myPeerConnection.close();
-        myPeerConnection = new RTCPeerConnection(rtcConfig);
-        
-        myPeerConnection.ontrack = (event) => {
-            const audioEl = document.getElementById('remote-audio');
-            console.log("Track received! Setting up audio...");
+// MODERATOR: Receive and play audio chunks
+socket.on('audio_chunk', async (data) => {
+    if (myRole !== 'moderator') return;
 
-            audioEl.srcObject = event.streams[0];
-            audioEl.autoplay = true;
-            audioEl.muted = false;
-            audioEl.volume = 1.0;
-            
-            audioEl.play().then(() => {
-                console.log("AUDIO IS PLAYING! 🎙️");
-                audioGate.classList.add('hidden');
-            }).catch(error => {
-                console.warn("Autoplay blocked. Showing Gate.");
-                audioGate.classList.remove('hidden');
-                unlockBtn.onclick = () => {
-                    audioEl.play().then(() => audioGate.classList.add('hidden'));
-                };
-            });
-        };
+    // Show the gate if AudioContext isn't unlocked yet
+    if (!audioContext || audioContext.state === 'suspended') {
+        if (audioGate) audioGate.classList.remove('hidden');
+        return;
+    }
 
-        myPeerConnection.onicecandidate = (event) => {
-            if(event.candidate) {
-                socket.emit('signal', {
-                    target: data.sender, 
-                    type: 'candidate',
-                    payload: event.candidate
-                });
-            }
-        };
-
-        await myPeerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
-        const answer = await myPeerConnection.createAnswer();
-        await myPeerConnection.setLocalDescription(answer);
-        socket.emit('signal', {
-            target: data.sender,
-            type: 'answer',
-            payload: answer
-        });
-    } 
-    else if (data.type === 'answer' && myPeerConnection) {
-        await myPeerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
-    } 
-    else if (data.type === 'candidate' && myPeerConnection) {
-        try {
-            await myPeerConnection.addIceCandidate(new RTCIceCandidate(data.payload));
-        } catch (e) {}
+    // Decode and queue the chunk
+    try {
+        const arrayBuffer = data.buffer;
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        audioQueue.push(audioBuffer);
+        if (!isPlaying) playNextChunk();
+    } catch (err) {
+        console.warn("Could not decode audio chunk:", err);
     }
 });
 
-socket.on('mic_stopped', () => {
-    stopStreaming();
-    alert("Host stopped your audio.");
-});
+function playNextChunk() {
+    if (audioQueue.length === 0) {
+        isPlaying = false;
+        return;
+    }
+    isPlaying = true;
+    const buffer = audioQueue.shift();
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    source.onended = playNextChunk;
+    source.start();
+}
+
+// --- Helpers ---
+
+function getSupportedMimeType() {
+    const types = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+        'audio/mp4',
+    ];
+    for (const type of types) {
+        if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return ''; // browser default
+}
 
 function stopStreaming() {
-    if (myPeerConnection) {
-        myPeerConnection.close();
-        myPeerConnection = null;
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
     }
+    mediaRecorder = null;
+    audioQueue = [];
+    isPlaying = false;
+
     socket.emit('lower_hand', currentRoom);
     btnStop.classList.add('hidden');
     btnRaise.classList.remove('hidden');
     statusText.innerText = "Ready to ask a question?";
 }
+
+socket.on('mic_stopped', () => {
+    stopStreaming();
+    alert("Host stopped your audio.");
+});
