@@ -9,14 +9,9 @@
     --text: #ffffff;
 }
 
-/* --- EMERGENCY UTILITY FIXES --- */
+/* --- UTILITY --- */
 .hidden { display: none !important; }
-
-.view {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
+.view { display: flex; flex-direction: column; gap: 12px; }
 
 /* --- Animations --- */
 @keyframes slickBounce {
@@ -24,10 +19,7 @@
     30% { transform: scale(0.92); }
     100% { transform: scale(1); }
 }
-
-.bouncy-active {
-    animation: slickBounce 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
+.bouncy-active { animation: slickBounce 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -42,57 +34,61 @@ body {
     overflow: hidden;
 }
 
-/* --- BACKGROUND STACKING --- */
-#bg { 
-    position: fixed; 
-    inset: 0; 
-    z-index: 0; 
-    background: url('micdropbackground.jpg') center / cover; 
-    filter: brightness(0.9); /* RESTORED LIGHT */
-}
+#bg { position: fixed; inset: 0; z-index: 0; background: url('micdropbackground.jpg') center / cover; filter: brightness(0.9); }
+#gl { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
 
-#gl { 
-    position: fixed; 
-    inset: 0; 
-    z-index: 1; /* SHADER ON TOP OF BG */
-    pointer-events: none; 
-}
-
-/* --- THE GLASS CONTAINER --- */
 .glass-container {
     position: relative;
-    z-index: 10 !important; /* UI ON TOP OF SHADER */
-    pointer-events: auto !important;
-    
-    background: transparent; /* MUST BE TRANSPARENT FOR SHADER */
-    
+    z-index: 2;
+    background: transparent;
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 28px;
     padding: 3rem;
     width: 90%;
     max-width: 420px;
     text-align: center;
-    
-    backdrop-filter: saturate(160%);
-    -webkit-backdrop-filter: saturate(160%);
-    
-    box-shadow:
-        inset 0 1.5px 0 rgba(255,255,255,0.35),
-        inset 1px 0 0 rgba(255,255,255,0.08),
-        0 8px 40px rgba(0,0,0,0.35);
+    backdrop-filter: saturate(140%);
+    -webkit-backdrop-filter: saturate(140%);
+    box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.3), 0 8px 40px rgba(0,0,0,0.4);
 }
 
-h1 { font-family: "Rajdhani"; letter-spacing: 8px; text-shadow: 0 0 20px var(--cyan); margin-bottom: 2rem; text-transform: uppercase; }
+h1 { font-family: "Rajdhani"; letter-spacing: 8px; text-transform: uppercase; text-shadow: 0 0 20px var(--cyan); margin-bottom: 2rem; }
 
-/* --- Hamburger & Nav --- */
+/* --- ATTENDEE LIST STYLES (THE MISSING LINK) --- */
+.list-container {
+    max-height: 250px;
+    overflow-y: auto;
+    margin-top: 1rem;
+    padding-right: 5px;
+}
+
+.attendee-item {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.9rem;
+    transition: 0.3s ease;
+}
+
+.attendee-item.hand-raised {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: var(--cyan);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+}
+
+/* --- UI ELEMENTS --- */
 .hamburger-container { position: fixed; top: 30px; right: 30px; z-index: 1000; cursor: pointer; }
-.hamburger-bar { width: 22px; height: 2px; background: #fff; margin: 5px 0; border-radius: 2px; transition: 0.3s; }
+.hamburger-bar { width: 22px; height: 2px; background: #fff; margin: 5px 0; border-radius: 2px; }
 
 .glass-nav {
     position: fixed; top: 0; right: -300px; width: 280px; height: 100vh;
-    background: rgba(0,0,0,0.7); backdrop-filter: blur(30px) saturate(150%);
-    border-left: 1px solid var(--carbon); z-index: 999;
-    padding: 80px 30px; transition: 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+    background: rgba(0,0,0,0.75); backdrop-filter: blur(30px); border-left: 1px solid var(--carbon); 
+    z-index: 999; padding: 80px 30px; transition: 0.5s cubic-bezier(0.19, 1, 0.22, 1);
 }
 .glass-nav.active { right: 0; }
 
@@ -100,32 +96,17 @@ h1 { font-family: "Rajdhani"; letter-spacing: 8px; text-shadow: 0 0 20px var(--c
     display: flex; align-items: center; gap: 12px; padding: 12px;
     background: rgba(255,255,255,0.05); border-radius: 12px; margin-top: 15px;
 }
-.status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; transition: 0.3s; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
 .mic-on .status-dot { background: var(--success); box-shadow: 0 0 10px var(--success); }
-.mic-off .status-dot { background: var(--danger); }
 
-/* --- Professional Buttons --- */
-button {
-    width: 100%; padding: 16px; border: none; border-radius: 16px;
-    font-weight: 700; text-transform: uppercase; letter-spacing: 2px; font-size: 0.75rem;
-    cursor: pointer;
-}
-
-.primary-btn {
-    background: var(--cyan); color: #000;
-    box-shadow: 0 8px 20px rgba(0, 212, 255, 0.3);
-}
-
-.secondary-btn {
-    background: rgba(0,0,0,0.3); color: #fff;
-    border: 1px solid var(--carbon);
-}
-
+button { width: 100%; padding: 16px; border: none; border-radius: 16px; font-weight: 700; text-transform: uppercase; cursor: pointer; }
+.primary-btn { background: var(--cyan); color: #000; box-shadow: 0 8px 20px rgba(0, 212, 255, 0.2); }
+.secondary-btn { background: rgba(0,0,0,0.3); color: #fff; border: 1px solid var(--carbon); }
 .danger-btn { background: var(--danger); color: #fff; }
 .text-btn { background: transparent; color: #fff; opacity: 0.5; }
 
 input {
-    width: 100%; padding: 16px; background: rgba(0,0,0,0.3);
+    width: 100%; padding: 16px; margin-bottom: 15px; background: rgba(0,0,0,0.3);
     border: 1px solid var(--carbon); border-radius: 14px; color: #fff; outline: none;
 }
 input:focus { border-color: var(--cyan); }
