@@ -138,13 +138,19 @@
                 if (radius < 0.5) return sampleBg(uv);
                 vec3 sum = vec3(0.0);
                 vec2 px = 1.0 / uResolution;
-                vec2 offsets[8];
-                offsets[0] = vec2(-0.94, -0.39); offsets[1] = vec2(0.94, -0.76);
-                offsets[2] = vec2(-0.09, -0.92); offsets[3] = vec2(0.34, 0.29);
-                offsets[4] = vec2(-0.81, 0.48); offsets[5] = vec2(0.89, 0.41);
-                offsets[6] = vec2(0.18, -0.30); offsets[7] = vec2(-0.32, -0.03);
-                for (int i = 0; i < 8; i++) sum += sampleBg(uv + offsets[i] * radius * px);
-                return sum / 8.0;
+                vec2 offsets[16];
+                offsets[0]  = vec2(-0.94201, -0.39906); offsets[1]  = vec2( 0.94558, -0.76890);
+                offsets[2]  = vec2(-0.09418, -0.92938); offsets[3]  = vec2( 0.34495,  0.29387);
+                offsets[4]  = vec2(-0.91588, -0.45771); offsets[5]  = vec2(-0.81544,  0.48568);
+                offsets[6]  = vec2(-0.38277, -0.56071); offsets[7]  = vec2(-0.12675,  0.84686);
+                offsets[8]  = vec2( 0.89642,  0.41254); offsets[9]  = vec2( 0.18150, -0.30020);
+                offsets[10] = vec2(-0.01445, -0.16001); offsets[11] = vec2( 0.59614,  0.71118);
+                offsets[12] = vec2( 0.49742, -0.47280); offsets[13] = vec2( 0.80685,  0.04588);
+                offsets[14] = vec2(-0.32490, -0.03965); offsets[15] = vec2(-0.60975,  0.06566);
+                for (int i = 0; i < 16; i++) {
+                    sum += sampleBg(uv + offsets[i] * radius * px);
+                }
+                return sum / 16.0;
             }
 
             void main() {
@@ -178,12 +184,10 @@
                 grad = normalize(grad);
 
                 vec2 offset = -grad * displacement / uResolution;
-                vec2 screenUV = screenPx / uResolution;
-                vec2 refractedUV = screenUV + offset;
+                vec2 refractedUV = (screenPx / uResolution) + offset;
 
                 vec3 color = sampleBgBlurred(refractedUV, uBlur);
                 
-                // Specular highlight on bezel
                 float spec = pow(max(dot(grad, normalize(vec2(0.5, 0.5))), 0.0), 10.0);
                 color += vec3(spec * 0.2 * uSpecular);
 
@@ -201,7 +205,7 @@
                 uBezel:       { value: 55 },
                 uThickness:   { value: 60 },
                 uIOR:         { value: 2.8 },
-                uBlur:         { value: 1.5 },
+                uBlur:        { value: 1.5 },
                 uSpecular:    { value: 0.7 },
                 uTint:        { value: 0.04 },
                 uBgTex:       { value: null },
