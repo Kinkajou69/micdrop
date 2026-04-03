@@ -3,7 +3,7 @@ const socket = io();
 // State
 let myRole = '';
 let currentRoom = '';
-let currentModeratorId = ''; // FIX: Store the specific socket ID of the host
+let currentModeratorId = ''; 
 let myPeerConnection = null;
 let localStream = null;
 
@@ -42,7 +42,6 @@ document.getElementById('btn-enter').onclick = () => {
 socket.on('room_created', (code) => {
     myRole = 'moderator';
     currentRoom = code;
-    // Moderator is their own moderator, technically
     currentModeratorId = socket.id; 
     
     document.getElementById('room-display').innerText = code;
@@ -54,7 +53,6 @@ socket.on('room_created', (code) => {
 socket.on('joined_success', (data) => {
     myRole = 'attendee';
     currentRoom = data.code;
-    // FIX: Save the moderator's ID for WebRTC targeting
     currentModeratorId = data.moderatorId;
     
     document.getElementById('room-display').innerText = data.code;
@@ -65,7 +63,7 @@ socket.on('joined_success', (data) => {
 
 socket.on('error_msg', (msg) => {
     alert(msg);
-    location.reload(); // Hard reset on critical error
+    location.reload(); 
 });
 
 // --- MODERATOR UI LOGIC ---
@@ -76,7 +74,6 @@ socket.on('update_attendees', (attendees) => {
     const list = document.getElementById('attendee-list');
     list.innerHTML = '';
     
-    // Sort: Hand raised moves to top
     attendees.sort((a, b) => (b.handRaised === true) - (a.handRaised === true));
 
     attendees.forEach(att => {
@@ -93,7 +90,6 @@ socket.on('update_attendees', (attendees) => {
             `;
         } else {
              controls = `<span style="font-size:0.8rem; opacity:0.6; margin-right:10px">Listening</span>`;
-             // If we wanted to forcefully mute someone currently speaking, we'd add a "Stop" button here for active speakers
         }
 
         div.innerHTML = `<span>${att.name}</span>${controls}`;
@@ -102,7 +98,6 @@ socket.on('update_attendees', (attendees) => {
 });
 
 window.approveSpeaker = (id) => {
-    // Reset any previous connections first to be safe
     resetConnection(); 
     socket.emit('moderator_action', { action: 'approve', targetId: id, code: currentRoom });
 };
@@ -114,7 +109,6 @@ window.rejectSpeaker = (id) => {
 // --- ATTENDEE UI LOGIC ---
 
 btnRaise.onclick = () => {
-    // Simple cooldown check
     const lastRejection = localStorage.getItem('micdrop_reject_time');
     if (lastRejection && (Date.now() - parseInt(lastRejection) < 30000)) {
         alert("Please wait a moment before raising your hand again.");
@@ -126,18 +120,18 @@ btnRaise.onclick = () => {
 };
 
 btnStop.onclick = () => {
-    stopStreaming(); // User clicked "Done"
+    stopStreaming(); 
 };
 
 socket.on('hand_rejected', () => {
-    resetConnection(); // <--- THIS is the missing piece!
+    resetConnection(); 
     statusText.innerText = "Host declined. Try again later.";
     localStorage.setItem('micdrop_reject_time', Date.now());
     btnRaise.classList.remove('hidden');
-    btnStop.classList.add('hidden'); // Hide the stop button if it was visible
+    btnStop.classList.add('hidden'); 
 });
 
-// --- WebRTC LOGIC (The Hard Part) ---
+// --- WebRTC LOGIC ---
 
 const rtcConfig = {
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -154,9 +148,8 @@ function resetConnection() {
     }
 }
 
-// 1. ATTENDEE: "You are approved"
+// 1. ATTENDEE: Approved
 socket.on('mic_approved', async (data) => {
-    // Double check we have the latest mod ID
     if(data.moderatorId) currentModeratorId = data.moderatorId;
 
     statusText.innerText = "You are LIVE! 🎙️";
@@ -169,22 +162,19 @@ socket.on('mic_approved', async (data) => {
         myPeerConnection = new RTCPeerConnection(rtcConfig);
         localStream.getTracks().forEach(track => myPeerConnection.addTrack(track, localStream));
 
-        // ICE Candidate: Send to Moderator
         myPeerConnection.onicecandidate = (event) => {
             if (event.candidate) {
                 socket.emit('signal', {
-                    target: currentModeratorId, // FIX: Using real ID
+                    target: currentModeratorId, 
                     type: 'candidate',
                     payload: event.candidate
                 });
             }
         };
 
-        // Create Offer
         const offer = await myPeerConnection.createOffer();
         await myPeerConnection.setLocalDescription(offer);
         
-        // Send Offer to Moderator
         socket.emit('signal', {
             target: currentModeratorId,
             type: 'offer',
@@ -198,52 +188,64 @@ socket.on('mic_approved', async (data) => {
     }
 });
 
-// 2. MODERATOR: "Incoming Call" (Offer)
+// 2. MODERATOR: Incoming Call (Offer)
 socket.on('signal', async (data) => {
-    // If we are not the target, ignore (shouldn't happen with correct routing, but safety first)
     if(myRole === 'moderator' && data.type === 'offer') {
         
-        resetConnection(); // Ensure we don't have old tracks playing
+        resetConnection(); 
         myPeerConnection = new RTCPeerConnection(rtcConfig);
         
-        // When audio arrives, play it
         myPeerConnection.ontrack = (event) => {
             const audioEl = document.getElementById('remote-audio');
+            
+            // UI & Mobile Security Fixes
+            audioEl.muted = false;      
+            audioEl.autoplay = true; 
+            audioEl.playsInline = true; 
             audioEl.srcObject = event.streams[0];
-            // Vital: We need to handle the promise to avoid "uncaught promise" errors
-            audioEl.play().catch(e => console.warn("Autoplay blocked. User interaction needed.", e));
+            
+            // Handle the play promise to clear autoplay blocks
+            const playPromise = audioEl.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log("Audio streaming successfully!");
+                }).catch(error => {
+                    console.warn("Autoplay prevented. Interaction needed.", error);
+                    // Helpful UI hint if audio is blocked
+                    const list = document.getElementById('attendee-list');
+                    const notice = document.createElement('p');
+                    notice.innerText = "⚠️ Click anywhere to enable audio!";
+                    notice.style.color = "white";
+                    notice.style.fontSize = "0.8rem";
+                    list.prepend(notice);
+                });
+            }
         };
 
         myPeerConnection.onicecandidate = (event) => {
             if(event.candidate) {
                 socket.emit('signal', {
-                    target: data.sender, // Reply to the sender (Attendee)
+                    target: data.sender, 
                     type: 'candidate',
                     payload: event.candidate
                 });
             }
         };
 
-        // Handle the Offer
         await myPeerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
         const answer = await myPeerConnection.createAnswer();
         await myPeerConnection.setLocalDescription(answer);
         
-        // Send Answer back
         socket.emit('signal', {
             target: data.sender,
             type: 'answer',
             payload: answer
         });
         
-        // Show who is speaking (Optional UI polish)
-        // We could look up data.sender in our attendee list to show "Bob is speaking"
     } 
-    // Handle Answer (Attendee receiving back from Mod)
     else if (data.type === 'answer' && myPeerConnection) {
         await myPeerConnection.setRemoteDescription(new RTCSessionDescription(data.payload));
     } 
-    // Handle ICE Candidates (Both sides)
     else if (data.type === 'candidate' && myPeerConnection) {
         try {
             await myPeerConnection.addIceCandidate(new RTCIceCandidate(data.payload));
@@ -253,7 +255,6 @@ socket.on('signal', async (data) => {
     }
 });
 
-// Global Stop
 socket.on('mic_stopped', () => {
     stopStreaming();
     alert("Host stopped your audio.");
@@ -263,7 +264,6 @@ function stopStreaming() {
     resetConnection();
     socket.emit('lower_hand', currentRoom);
     
-    // UI Reset
     btnStop.classList.add('hidden');
     btnRaise.classList.remove('hidden');
     statusText.innerText = "Ready to ask a question?";
