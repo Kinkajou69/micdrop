@@ -27,16 +27,43 @@ function showView(viewName) {
     views[viewName].classList.remove('hidden');
 }
 
+// --- MOBILE "WARM UP" FUNCTION ---
+// This forces the phone to unlock the hardware before any socket logic starts
+async function warmUpAudio() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Keep the stream alive so the phone knows we are "Active"
+        localStream = stream; 
+        console.log("Hardware Unlocked 🎙️");
+        return true;
+    } catch (err) {
+        console.error("Hardware Unlock Failed:", err);
+        alert("Microphone access is REQUIRED for this app to work on mobile. Please check your settings.");
+        return false;
+    }
+}
+
 // --- Button Listeners ---
-document.getElementById('btn-start').onclick = () => socket.emit('create_room');
+
+// MODIFIED: Host now "Warms up" their mic too, otherwise they can't hear others!
+document.getElementById('btn-start').onclick = async () => {
+    const ready = await warmUpAudio();
+    if(ready) socket.emit('create_room');
+};
+
 document.getElementById('btn-join').onclick = () => showView('join');
 document.getElementById('btn-back').onclick = () => showView('landing');
 
-document.getElementById('btn-enter').onclick = () => {
+// MODIFIED: Guests "Warm up" as they enter the room
+document.getElementById('btn-enter').onclick = async () => {
     const name = document.getElementById('input-name').value;
     const code = document.getElementById('input-code').value.toUpperCase();
-    if(name && code) socket.emit('join_room', { code, name });
-    else alert("Please fill in both fields");
+    if(name && code) {
+        const ready = await warmUpAudio();
+        if(ready) socket.emit('join_room', { code, name });
+    } else {
+        alert("Please fill in both fields");
+    }
 };
 
 // --- Socket Events: General ---
@@ -100,7 +127,10 @@ socket.on('update_attendees', (attendees) => {
 });
 
 window.approveSpeaker = (id) => {
-    resetConnection(); 
+    if (myPeerConnection) {
+        myPeerConnection.close();
+        myPeerConnection = null;
+    }
     socket.emit('moderator_action', { action: 'approve', targetId: id, code: currentRoom });
 };
 
@@ -111,11 +141,7 @@ window.rejectSpeaker = (id) => {
 // --- ATTENDEE UI LOGIC ---
 
 btnRaise.onclick = () => {
-    const lastRejection = localStorage.getItem('micdrop_reject_time');
-    if (lastRejection && (Date.now() - parseInt(lastRejection) < 30000)) {
-        alert("Please wait a moment before raising your hand again.");
-        return;
-    }
+    // We already warmed up the mic in btn-enter, so we just emit the event
     socket.emit('raise_hand', currentRoom);
     statusText.innerText = "Hand Raised! Waiting for host...";
     btnRaise.classList.add('hidden');
@@ -126,7 +152,6 @@ btnStop.onclick = () => {
 };
 
 socket.on('hand_rejected', () => {
-    resetConnection(); 
     statusText.innerText = "Host declined. Try again later.";
     localStorage.setItem('micdrop_reject_time', Date.now());
     btnRaise.classList.remove('hidden');
@@ -152,10 +177,7 @@ function resetConnection() {
         myPeerConnection.close();
         myPeerConnection = null;
     }
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-    }
+    // We DON'T stop localStream here on mobile, otherwise we lose the "warm up"
 }
 
 // 1. ATTENDEE: Approved
@@ -166,8 +188,10 @@ socket.on('mic_approved', async (data) => {
     btnStop.classList.remove('hidden');
     
     try {
-        resetConnection();
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Reuse the stream we got during "btn-enter"
+        if (!localStream || !localStream.active) {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
         
         myPeerConnection = new RTCPeerConnection(rtcConfig);
         localStream.getTracks().forEach(track => myPeerConnection.addTrack(track, localStream));
@@ -192,8 +216,8 @@ socket.on('mic_approved', async (data) => {
         });
         
     } catch (err) {
-        console.error("Mic Error:", err);
-        alert("Could not access microphone.");
+        console.error("WebRTC Error:", err);
+        alert("Connection failed. Try refreshing.");
         stopStreaming();
     }
 });
@@ -202,7 +226,7 @@ socket.on('mic_approved', async (data) => {
 socket.on('signal', async (data) => {
     if(myRole === 'moderator' && data.type === 'offer') {
         
-        resetConnection(); 
+        if (myPeerConnection) myPeerConnection.close();
         myPeerConnection = new RTCPeerConnection(rtcConfig);
         
         myPeerConnection.ontrack = (event) => {
@@ -213,9 +237,8 @@ socket.on('signal', async (data) => {
             audioEl.muted = false;      
             audioEl.srcObject = event.streams[0];
             
-            // Try Autoplay
             audioEl.play().then(() => {
-                console.log("Audio playing successfully!");
+                console.log("Streaming Audio!");
             }).catch(error => {
                 console.warn("Autoplay blocked. Showing Gate.");
                 audioGate.classList.remove('hidden');
@@ -255,9 +278,7 @@ socket.on('signal', async (data) => {
     else if (data.type === 'candidate' && myPeerConnection) {
         try {
             await myPeerConnection.addIceCandidate(new RTCIceCandidate(data.payload));
-        } catch (e) {
-            console.error("Error adding ICE:", e);
-        }
+        } catch (e) {}
     }
 });
 
@@ -267,9 +288,12 @@ socket.on('mic_stopped', () => {
 });
 
 function stopStreaming() {
-    resetConnection();
+    if (myPeerConnection) {
+        myPeerConnection.close();
+        myPeerConnection = null;
+    }
+    // We keep the localStream active so the "Warm Up" persists for the next use!
     socket.emit('lower_hand', currentRoom);
-    
     btnStop.classList.add('hidden');
     btnRaise.classList.remove('hidden');
     statusText.innerText = "Ready to ask a question?";
