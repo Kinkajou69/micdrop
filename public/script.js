@@ -86,6 +86,7 @@ document.getElementById('btn-enter').onclick = async () => {
 
 // --- Socket Events: General ---
 socket.on('room_created', (code) => {
+    unlockAudioContext();
     myRole = 'moderator';
     currentRoom = code;
     currentModeratorId = socket.id;
