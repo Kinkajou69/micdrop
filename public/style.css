@@ -6,8 +6,8 @@
     --cyan-glow: rgba(0, 229, 255, 0.25);
     --magenta-glow: rgba(224, 64, 251, 0.25);
 
-    --glass-bg: rgba(5, 10, 30, 0.55);
-    --glass-border: rgba(0, 229, 255, 0.2);
+    --glass-bg: rgba(20, 20, 50, 0.35);
+    --glass-border: rgba(255, 255, 255, 0.25);
 
     --primary: var(--cyan);
     --primary-text: #000000;
@@ -35,25 +35,30 @@ body {
     overflow: hidden;
 }
 
-/* --- Main Glass Panel --- */
+/* --- Frosted Glass Panel --- */
 .glass-container {
+    /* Lower opacity + heavy blur = frosted glass */
     background: var(--glass-bg);
-    backdrop-filter: blur(48px) saturate(180%);
-    -webkit-backdrop-filter: blur(48px) saturate(180%);
+    backdrop-filter: blur(72px) saturate(160%) brightness(1.1);
+    -webkit-backdrop-filter: blur(72px) saturate(160%) brightness(1.1);
 
-    border: 1px solid var(--glass-border);
+    /* Thin white border + bright top highlight = glass catching light */
+    border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: 28px;
 
     padding: 3rem;
     width: 90%;
     max-width: 420px;
 
-    /* Dual glow matching the wallpaper's cyan/magenta */
     box-shadow:
-        0 0 0 1px rgba(0, 229, 255, 0.08),
-        0 20px 60px rgba(0, 0, 0, 0.5),
-        0 0 80px rgba(0, 229, 255, 0.08),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        /* Top edge light catch */
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.35),
+        /* Left edge subtle catch */
+        inset 1px 0 0 rgba(255, 255, 255, 0.1),
+        /* Outer shadow for depth */
+        0 24px 64px rgba(0, 0, 0, 0.4),
+        /* Subtle cyan ambient glow */
+        0 0 60px rgba(0, 229, 255, 0.06);
 
     text-align: center;
     transition: all 0.4s ease;
@@ -70,7 +75,6 @@ h1 {
     letter-spacing: 6px;
     font-size: 2rem;
 
-    /* Gradient text matching the wallpaper */
     background: linear-gradient(90deg, var(--cyan), var(--magenta));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -95,8 +99,8 @@ input {
     padding: 14px 16px;
     margin: 10px 0;
     border-radius: 12px;
-    border: 1px solid rgba(0, 229, 255, 0.15);
-    background: rgba(0, 229, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
     color: white;
     font-size: 1rem;
     font-family: "Inter", sans-serif;
@@ -110,7 +114,7 @@ input::placeholder {
 
 input:focus {
     outline: none;
-    background: rgba(0, 229, 255, 0.1);
+    background: rgba(255, 255, 255, 0.13);
     border-color: rgba(0, 229, 255, 0.5);
     box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
 }
@@ -138,7 +142,9 @@ button:active {
 .primary-btn {
     background: linear-gradient(135deg, var(--cyan), #0099cc);
     color: #000000;
-    box-shadow: 0 4px 24px rgba(0, 229, 255, 0.3);
+    box-shadow:
+        0 4px 24px rgba(0, 229, 255, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .primary-btn:hover {
@@ -147,20 +153,24 @@ button:active {
 }
 
 .secondary-btn {
-    background: var(--secondary-glass);
+    background: rgba(255, 255, 255, 0.08);
     color: white;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .secondary-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(0, 229, 255, 0.2);
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(0, 229, 255, 0.25);
 }
 
 .danger-btn {
     background: linear-gradient(135deg, var(--danger), #cc0033);
     color: white;
-    box-shadow: 0 4px 20px rgba(255, 59, 107, 0.3);
+    box-shadow:
+        0 4px 20px rgba(255, 59, 107, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .danger-btn:hover {
@@ -198,21 +208,24 @@ button:active {
 }
 
 .attendee-item {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.06);
     padding: 12px 18px;
     margin-bottom: 10px;
     border-radius: 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
     transition: all 0.3s ease;
 }
 
 .attendee-item.hand-raised {
     background: rgba(0, 229, 160, 0.1);
     border: 1px solid rgba(0, 229, 160, 0.4);
-    box-shadow: 0 0 20px rgba(0, 229, 160, 0.1);
+    box-shadow:
+        0 0 20px rgba(0, 229, 160, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 /* Status bar */
@@ -221,9 +234,10 @@ button:active {
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(5, 10, 30, 0.7);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(0, 229, 255, 0.2);
+    background: rgba(20, 20, 50, 0.4);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: 100px;
     padding: 8px 24px;
     font-size: 0.75rem;
@@ -231,7 +245,7 @@ button:active {
     text-transform: uppercase;
     color: rgba(255,255,255,0.7);
     z-index: 100;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
-/* Remove the orbs since the wallpaper handles atmosphere now */
 .bg-orb { display: none; }
