@@ -156,10 +156,13 @@ socket.on('hand_rejected', () => {
     btnStop.classList.add('hidden');
 });
 
-// --- MediaRecorder Audio Streaming (replaces WebRTC) ---
+// --- PCM Audio Streaming ---
 
 // ATTENDEE: Start streaming when approved
 socket.on('mic_approved', async (data) => {
+    // Guard: if already streaming, ignore duplicate approvals
+    if (mediaRecorder) return;
+
     if (data.moderatorId) currentModeratorId = data.moderatorId;
     statusText.innerText = "You are LIVE! 🎙️";
     btnStop.classList.remove('hidden');
@@ -169,32 +172,35 @@ socket.on('mic_approved', async (data) => {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
 
-        // Pick a supported MIME type
         const senderContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-const source = senderContext.createMediaStreamSource(localStream);
-const processor = senderContext.createScriptProcessor(4096, 1, 1);
+        const source = senderContext.createMediaStreamSource(localStream);
+        const processor = senderContext.createScriptProcessor(4096, 1, 1);
 
-source.connect(processor);
-processor.connect(senderContext.destination);
+        source.connect(processor);
+        processor.connect(senderContext.destination);
 
-processor.onaudioprocess = (e) => {
-    const float32 = e.inputBuffer.getChannelData(0);
-    const int16 = new Int16Array(float32.length);
-    for (let i = 0; i < float32.length; i++) {
-        int16[i] = Math.max(-32768, Math.min(32767, float32[i] * 32768));
-    }
-    socket.emit('audio_chunk', {
-        targetId: currentModeratorId,
-        buffer: int16.buffer,
-        sampleRate: 16000
-    });
-};
+        processor.onaudioprocess = (e) => {
+            const float32 = e.inputBuffer.getChannelData(0);
+            const int16 = new Int16Array(float32.length);
+            for (let i = 0; i < float32.length; i++) {
+                int16[i] = Math.max(-32768, Math.min(32767, float32[i] * 32768));
+            }
+            socket.emit('audio_chunk', {
+                targetId: currentModeratorId,
+                buffer: int16.buffer
+            });
+        };
 
-mediaRecorder = { stop: () => { processor.disconnect(); source.disconnect(); senderContext.close(); } };
-console.log("PCM streaming started ✅");
+        // Store a stop handle so stopStreaming() can clean up properly
+        mediaRecorder = {
+            stop: () => {
+                processor.disconnect();
+                source.disconnect();
+                senderContext.close();
+            }
+        };
 
-        // Fire every 250ms — low latency chunks
-        console.log("MediaRecorder started ✅");
+        console.log("PCM streaming started ✅");
 
     } catch (err) {
         console.error("Streaming error:", err);
@@ -206,13 +212,17 @@ console.log("PCM streaming started ✅");
 // MODERATOR: Receive and play audio chunks
 socket.on('audio_chunk', async (data) => {
     if (myRole !== 'moderator') return;
+
+    // If AudioContext isn't unlocked yet, show the gate
     if (!audioContext || audioContext.state === 'suspended') {
         if (audioGate) audioGate.classList.remove('hidden');
         return;
     }
+
     try {
         const int16 = new Int16Array(data.buffer);
-        const audioBuffer = audioContext.createBuffer(1, int16.length, data.sampleRate);
+        // sampleRate hardcoded to match sender
+        const audioBuffer = audioContext.createBuffer(1, int16.length, 16000);
         const channel = audioBuffer.getChannelData(0);
         for (let i = 0; i < int16.length; i++) {
             channel[i] = int16[i] / 32768;
@@ -238,27 +248,13 @@ function playNextChunk() {
     source.start();
 }
 
-// --- Helpers ---
-
-function getSupportedMimeType() {
-    const types = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus',
-        'audio/ogg',
-        'audio/mp4',
-    ];
-    for (const type of types) {
-        if (MediaRecorder.isTypeSupported(type)) return type;
-    }
-    return ''; // browser default
-}
+// --- Cleanup ---
 
 function stopStreaming() {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    if (mediaRecorder) {
         mediaRecorder.stop();
+        mediaRecorder = null;
     }
-    mediaRecorder = null;
     audioQueue = [];
     isPlaying = false;
 
