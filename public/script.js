@@ -1,5 +1,37 @@
 const socket = io();
 
+// 1. Priming the Audio
+const clickSound = new Audio('click.mp3');
+clickSound.load(); // Forces the browser to start fetching the file immediately
+
+const playClick = () => {
+    // Some browsers need a kick to play audio
+    clickSound.currentTime = 0;
+    const playPromise = clickSound.play();
+    
+    if (playPromise !== undefined) {
+        playPromise.catch(error => {
+            console.warn("Click sound blocked or file not found:", error);
+        });
+    }
+};
+
+// 2. Event Delegation (The "Smart" way)
+// This listens for clicks on the ENTIRE document and only triggers if a button is hit.
+// This fixes the issue where 'Approve/Deny' buttons weren't making sound!
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+
+    // Trigger Sound
+    playClick();
+
+    // Trigger Bouncy Animation
+    btn.classList.remove('bouncy-active');
+    void btn.offsetWidth; // Force reflow
+    btn.classList.add('bouncy-active');
+});
+
 // State
 let myRole = '';
 let currentRoom = '';
@@ -23,6 +55,10 @@ const btnRaise = document.getElementById('btn-raise-hand');
 const btnStop = document.getElementById('btn-stop-talking');
 const audioGate = document.getElementById('audio-gate');
 const unlockBtn = document.getElementById('btn-unlock-audio');
+const navTrigger = document.getElementById('nav-trigger');
+const sideNav = document.getElementById('side-nav');
+const micStatusIndicator = document.getElementById('mic-status-pill');
+const micStatusText = document.getElementById('mic-status-text');
 
 // --- Navigation Helpers ---
 function showView(viewName) {
@@ -30,7 +66,20 @@ function showView(viewName) {
     views[viewName].classList.remove('hidden');
 }
 
-// --- Audio Context Unlock (handles mobile autoplay policy) ---
+// --- Mic Status UI Update ---
+function updateMicUI(status) {
+    const indicator = document.getElementById('mic-status-indicator');
+    indicator.classList.remove('mic-off', 'mic-on');
+    if (status === 'on') {
+        indicator.classList.add('mic-on');
+        micStatusText.innerText = "MIC: ACTIVE 🎙️";
+    } else {
+        indicator.classList.add('mic-off');
+        micStatusText.innerText = "MIC: DISCONNECTED";
+    }
+}
+
+// --- Audio Context Unlock ---
 function unlockAudioContext() {
     if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -40,9 +89,9 @@ function unlockAudioContext() {
     }
 }
 
-// Attach unlock to the gate button
 if (unlockBtn) {
     unlockBtn.onclick = () => {
+        playClick();
         unlockAudioContext();
         if (audioGate) audioGate.classList.add('hidden');
     };
@@ -54,10 +103,12 @@ async function warmUpAudio() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         localStream = stream;
         console.log("Mic access granted ✅");
+        updateMicUI('on');
         return true;
     } catch (err) {
         console.error("Mic access denied:", err);
-        alert("Microphone access is required. Please allow it in your browser settings.");
+        updateMicUI('off');
+        alert("Microphone access is required.");
         return false;
     }
 }
@@ -84,6 +135,19 @@ document.getElementById('btn-enter').onclick = async () => {
     }
 };
 
+// --- Bouncy Animations + Sound Trigger ---
+document.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', function() {
+        playClick();
+        this.classList.remove('bouncy-active');
+        void this.offsetWidth; // Trigger reflow
+        this.classList.add('bouncy-active');
+    });
+});
+
+// Hamburger Toggle
+navTrigger.onclick = () => sideNav.classList.toggle('active');
+
 // --- Socket Events: General ---
 socket.on('room_created', (code) => {
     unlockAudioContext();
@@ -106,63 +170,10 @@ socket.on('joined_success', (data) => {
     showView('attendee');
 });
 
-socket.on('error_msg', (msg) => {
-    alert(msg);
-    location.reload();
-});
+// --- PCM Audio Streaming Logic (Restored) ---
 
-// --- Moderator UI ---
-socket.on('update_attendees', (attendees) => {
-    if (myRole !== 'moderator') return;
-    const list = document.getElementById('attendee-list');
-    list.innerHTML = '';
-    attendees.sort((a, b) => (b.handRaised === true) - (a.handRaised === true));
-    attendees.forEach(att => {
-        const div = document.createElement('div');
-        div.className = `attendee-item ${att.handRaised ? 'hand-raised' : ''}`;
-        let controls = att.handRaised
-            ? `<div class="mod-controls">
-                <button class="primary-btn" onclick="approveSpeaker('${att.id}')">✅ Speak</button>
-                <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">❌ Deny</button>
-               </div>`
-            : `<span style="font-size:0.8rem; opacity:0.6; margin-right:10px">Listening</span>`;
-        div.innerHTML = `<span>${att.name}</span>${controls}`;
-        list.appendChild(div);
-    });
-});
-
-window.approveSpeaker = (id) => {
-    socket.emit('moderator_action', { action: 'approve', targetId: id, code: currentRoom });
-};
-
-window.rejectSpeaker = (id) => {
-    socket.emit('moderator_action', { action: 'reject', targetId: id, code: currentRoom });
-};
-
-// --- Attendee UI ---
-btnRaise.onclick = () => {
-    socket.emit('raise_hand', currentRoom);
-    statusText.innerText = "Hand raised! Waiting for host...";
-    btnRaise.classList.add('hidden');
-};
-
-btnStop.onclick = () => {
-    stopStreaming();
-};
-
-socket.on('hand_rejected', () => {
-    statusText.innerText = "Host declined. Try again later.";
-    btnRaise.classList.remove('hidden');
-    btnStop.classList.add('hidden');
-});
-
-// --- PCM Audio Streaming ---
-
-// ATTENDEE: Start streaming when approved
 socket.on('mic_approved', async (data) => {
-    // Guard: if already streaming, ignore duplicate approvals
     if (mediaRecorder) return;
-
     if (data.moderatorId) currentModeratorId = data.moderatorId;
     statusText.innerText = "You are LIVE! 🎙️";
     btnStop.classList.remove('hidden');
@@ -171,7 +182,6 @@ socket.on('mic_approved', async (data) => {
         if (!localStream || !localStream.active) {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
-
         const senderContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
         const source = senderContext.createMediaStreamSource(localStream);
         const processor = senderContext.createScriptProcessor(4096, 1, 1);
@@ -190,55 +200,30 @@ socket.on('mic_approved', async (data) => {
                 buffer: int16.buffer
             });
         };
-
-        // Store a stop handle so stopStreaming() can clean up properly
         mediaRecorder = {
-            stop: () => {
-                processor.disconnect();
-                source.disconnect();
-                senderContext.close();
-            }
+            stop: () => { processor.disconnect(); source.disconnect(); senderContext.close(); }
         };
-
-        console.log("PCM streaming started ✅");
-
     } catch (err) {
-        console.error("Streaming error:", err);
-        alert("Could not start audio stream.");
         stopStreaming();
     }
 });
 
-// MODERATOR: Receive and play audio chunks
 socket.on('audio_chunk', async (data) => {
     if (myRole !== 'moderator') return;
-
-    // If AudioContext isn't unlocked yet, show the gate
     if (!audioContext || audioContext.state === 'suspended') {
         if (audioGate) audioGate.classList.remove('hidden');
         return;
     }
-
-    try {
-        const int16 = new Int16Array(data.buffer);
-        // sampleRate hardcoded to match sender
-        const audioBuffer = audioContext.createBuffer(1, int16.length, 16000);
-        const channel = audioBuffer.getChannelData(0);
-        for (let i = 0; i < int16.length; i++) {
-            channel[i] = int16[i] / 32768;
-        }
-        audioQueue.push(audioBuffer);
-        if (!isPlaying) playNextChunk();
-    } catch (err) {
-        console.warn("Could not decode audio chunk:", err);
-    }
+    const int16 = new Int16Array(data.buffer);
+    const audioBuffer = audioContext.createBuffer(1, int16.length, 16000);
+    const channel = audioBuffer.getChannelData(0);
+    for (let i = 0; i < int16.length; i++) { channel[i] = int16[i] / 32768; }
+    audioQueue.push(audioBuffer);
+    if (!isPlaying) playNextChunk();
 });
 
 function playNextChunk() {
-    if (audioQueue.length === 0) {
-        isPlaying = false;
-        return;
-    }
+    if (audioQueue.length === 0) { isPlaying = false; return; }
     isPlaying = true;
     const buffer = audioQueue.shift();
     const source = audioContext.createBufferSource();
@@ -248,23 +233,19 @@ function playNextChunk() {
     source.start();
 }
 
-// --- Cleanup ---
-
 function stopStreaming() {
-    if (mediaRecorder) {
-        mediaRecorder.stop();
-        mediaRecorder = null;
-    }
+    if (mediaRecorder) { mediaRecorder.stop(); mediaRecorder = null; }
     audioQueue = [];
     isPlaying = false;
-
     socket.emit('lower_hand', currentRoom);
     btnStop.classList.add('hidden');
     btnRaise.classList.remove('hidden');
     statusText.innerText = "Ready to ask a question?";
 }
 
-socket.on('mic_stopped', () => {
-    stopStreaming();
-    alert("Host stopped your audio.");
+socket.on('mic_stopped', () => stopStreaming());
+socket.on('hand_rejected', () => {
+    statusText.innerText = "Host declined. Try again later.";
+    btnRaise.classList.remove('hidden');
+    btnStop.classList.add('hidden');
 });
