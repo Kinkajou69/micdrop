@@ -6,7 +6,6 @@ const path = require('path');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Store room states
 const rooms = {};
 
 function generateCode() {
@@ -14,9 +13,6 @@ function generateCode() {
 }
 
 io.on('connection', (socket) => {
-
-    // --- Room Management ---
-
     socket.on('create_room', () => {
         const code = generateCode();
         rooms[code] = {
@@ -44,8 +40,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- Hand Logic ---
-
     socket.on('raise_hand', (code) => {
         const room = rooms[code];
         if (room) {
@@ -68,14 +62,11 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- Moderation Logic ---
-
     socket.on('moderator_action', ({ action, targetId, code }) => {
         const room = rooms[code];
         if (!room) return;
 
         if (action === 'reject') {
-            // Tell the attendee to stop their mic AND reset their hand
             io.to(targetId).emit('mic_stopped');
             io.to(targetId).emit('hand_rejected');
             const attendee = room.attendees.find(a => a.id === targetId);
@@ -85,29 +76,21 @@ io.on('connection', (socket) => {
         else if (action === 'approve') {
             io.to(targetId).emit('mic_approved', { moderatorId: room.moderatorId });
         }
-        else if (action === 'stop') {
-            io.to(targetId).emit('mic_stopped');
-            const attendee = room.attendees.find(a => a.id === targetId);
-            if (attendee) attendee.handRaised = false;
-            io.to(room.moderatorId).emit('update_attendees', room.attendees);
-        }
     });
 
-    // --- Audio Chunk Relay ---
-
-    socket.on('audio_chunk', (data) => {
-        io.to(data.targetId).emit('audio_chunk', {
-            buffer: data.buffer
+    socket.on('signal', (data) => {
+        io.to(data.target).emit('signal', {
+            sender: socket.id,
+            type: data.type,
+            payload: data.payload
         });
     });
-
-    // --- Disconnect ---
 
     socket.on('disconnect', () => {
         for (const code in rooms) {
             const room = rooms[code];
             if (room.moderatorId === socket.id) {
-                io.to(code).emit('error_msg', 'Host has disconnected. Room closed.');
+                io.to(code).emit('error_msg', 'Host disconnected. Room closed.');
                 delete rooms[code];
             } else {
                 const index = room.attendees.findIndex(a => a.id === socket.id);
