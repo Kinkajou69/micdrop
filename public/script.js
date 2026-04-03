@@ -133,22 +133,18 @@ socket.on('hand_rejected', () => {
 
 // --- WebRTC LOGIC ---
 
-// ADDED TURN SERVERS FOR FIREWALL BYPASS
+// NEW STABLE CONFIG
 const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
         {
-            urls: 'turn:openrelay.metered.ca:80',
+            urls: 'turn:relay.metered.ca:80',
             username: 'openrelayproject',
             credential: 'openrelayproject'
         },
         {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-        },
-        {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            urls: 'turn:relay.metered.ca:443',
             username: 'openrelayproject',
             credential: 'openrelayproject'
         }
