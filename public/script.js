@@ -164,8 +164,7 @@ const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        // Fresh TURN relay (This is the "middleman" that fixes the 5G-to-WiFi jump)
+        // This is a more robust public TURN server that works on most restricted networks
         {
             urls: 'turn:openrelay.metered.ca:443',
             username: 'openrelayproject',
@@ -175,9 +174,14 @@ const rtcConfig = {
             urls: 'turn:openrelay.metered.ca:80',
             username: 'openrelayproject',
             credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:3478',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
         }
     ],
-    iceTransportPolicy: 'all',
+    iceTransportPolicy: 'relay', // FORCED RELAY: This tells the app "Don't even try to talk directly, just use the TURN server."
     iceCandidatePoolSize: 10 
 };
 
