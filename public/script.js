@@ -133,8 +133,26 @@ socket.on('hand_rejected', () => {
 
 // --- WebRTC LOGIC ---
 
+// ADDED TURN SERVERS FOR FIREWALL BYPASS
 const rtcConfig = {
-    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        }
+    ]
 };
 
 function resetConnection() {
@@ -204,14 +222,12 @@ socket.on('signal', async (data) => {
             audioEl.playsInline = true; 
             audioEl.srcObject = event.streams[0];
             
-            // Handle the play promise to clear autoplay blocks
             const playPromise = audioEl.play();
             if (playPromise !== undefined) {
                 playPromise.then(() => {
                     console.log("Audio streaming successfully!");
                 }).catch(error => {
                     console.warn("Autoplay prevented. Interaction needed.", error);
-                    // Helpful UI hint if audio is blocked
                     const list = document.getElementById('attendee-list');
                     const notice = document.createElement('p');
                     notice.innerText = "⚠️ Click anywhere to enable audio!";
