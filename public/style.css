@@ -3,30 +3,20 @@
 :root {
     --cyan: #00e5ff;
     --magenta: #e040fb;
-    --cyan-glow: rgba(0, 229, 255, 0.25);
-    --magenta-glow: rgba(224, 64, 251, 0.25);
-
-    --glass-bg: rgba(20, 20, 50, 0.35);
-    --glass-border: rgba(255, 255, 255, 0.25);
-
-    --primary: var(--cyan);
-    --primary-text: #000000;
-    --secondary-glass: rgba(255, 255, 255, 0.08);
-
     --danger: #ff3b6b;
     --success: #00e5a0;
     --text: #ffffff;
 }
 
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 body {
     margin: 0;
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-
-    background: url('micdropbackground.jpg');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-
     height: 100vh;
     display: flex;
     justify-content: center;
@@ -35,34 +25,41 @@ body {
     overflow: hidden;
 }
 
-/* --- Frosted Glass Panel --- */
-.glass-container {
-    /* Lower opacity + heavy blur = frosted glass */
-    background: var(--glass-bg);
-    backdrop-filter: blur(72px) saturate(160%) brightness(1.1);
-    -webkit-backdrop-filter: blur(72px) saturate(160%) brightness(1.1);
+/* --- WebGL background layers --- */
+#bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: url('micdropbackground.jpg') center/cover no-repeat;
+}
 
-    /* Thin white border + bright top highlight = glass catching light */
-    border: 1px solid rgba(255, 255, 255, 0.18);
+#gl {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* --- Glass container: transparent so WebGL shader shows through --- */
+.glass-container {
+    position: relative;
+    z-index: 2;
+    /* Completely transparent bg — WebGL draws the glass behind this */
+    background: transparent;
+
+    /* Just a whisper of a border to define the edge */
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 28px;
 
     padding: 3rem;
     width: 90%;
     max-width: 420px;
-
-    box-shadow:
-        /* Top edge light catch */
-        inset 0 1.5px 0 rgba(255, 255, 255, 0.35),
-        /* Left edge subtle catch */
-        inset 1px 0 0 rgba(255, 255, 255, 0.1),
-        /* Outer shadow for depth */
-        0 24px 64px rgba(0, 0, 0, 0.4),
-        /* Subtle cyan ambient glow */
-        0 0 60px rgba(0, 229, 255, 0.06);
-
     text-align: center;
-    transition: all 0.4s ease;
-    z-index: 10;
+
+    /* Subtle top highlight to sell the glass edge */
+    box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.3),
+        inset 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .hidden { display: none !important; }
@@ -74,12 +71,10 @@ h1 {
     text-transform: uppercase;
     letter-spacing: 6px;
     font-size: 2rem;
-
     background: linear-gradient(90deg, var(--cyan), var(--magenta));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-
     filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.4));
 }
 
@@ -93,14 +88,14 @@ h3 {
     color: var(--cyan);
 }
 
-/* Glass Input Fields */
+/* Inputs */
 input {
     width: 100%;
     padding: 14px 16px;
     margin: 10px 0;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.25);
     color: white;
     font-size: 1rem;
     font-family: "Inter", sans-serif;
@@ -114,7 +109,7 @@ input::placeholder {
 
 input:focus {
     outline: none;
-    background: rgba(255, 255, 255, 0.13);
+    background: rgba(0, 0, 0, 0.35);
     border-color: rgba(0, 229, 255, 0.5);
     box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
 }
@@ -135,9 +130,7 @@ button {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-button:active {
-    transform: scale(0.96);
-}
+button:active { transform: scale(0.96); }
 
 .primary-btn {
     background: linear-gradient(135deg, var(--cyan), #0099cc);
@@ -153,15 +146,14 @@ button:active {
 }
 
 .secondary-btn {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.2);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .secondary-btn:hover {
-    background: rgba(255, 255, 255, 0.14);
+    background: rgba(0, 0, 0, 0.3);
     border-color: rgba(0, 229, 255, 0.25);
 }
 
@@ -187,28 +179,22 @@ button:active {
 
 .text-btn:hover { opacity: 0.8; }
 
-/* Attendee List */
+/* Attendee list */
 .list-container {
     max-height: 300px;
     overflow-y: auto;
     margin-top: 1.5rem;
 }
 
-.list-container::-webkit-scrollbar {
-    width: 4px;
-}
-
-.list-container::-webkit-scrollbar-track {
-    background: transparent;
-}
-
+.list-container::-webkit-scrollbar { width: 4px; }
+.list-container::-webkit-scrollbar-track { background: transparent; }
 .list-container::-webkit-scrollbar-thumb {
     background: rgba(0, 229, 255, 0.3);
     border-radius: 2px;
 }
 
 .attendee-item {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.2);
     padding: 12px 18px;
     margin-bottom: 10px;
     border-radius: 14px;
@@ -216,16 +202,14 @@ button:active {
     justify-content: space-between;
     align-items: center;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
     transition: all 0.3s ease;
 }
 
 .attendee-item.hand-raised {
     background: rgba(0, 229, 160, 0.1);
     border: 1px solid rgba(0, 229, 160, 0.4);
-    box-shadow:
-        0 0 20px rgba(0, 229, 160, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 20px rgba(0, 229, 160, 0.1);
 }
 
 /* Status bar */
@@ -234,10 +218,9 @@ button:active {
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(20, 20, 50, 0.4);
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 100px;
     padding: 8px 24px;
     font-size: 0.75rem;
@@ -245,7 +228,28 @@ button:active {
     text-transform: uppercase;
     color: rgba(255,255,255,0.7);
     z-index: 100;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
+/* Audio gate overlay */
+#audio-gate {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.glass-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 20px;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+/* Kill the orbs, bg handles it */
 .bg-orb { display: none; }
