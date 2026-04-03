@@ -133,7 +133,6 @@ socket.on('hand_rejected', () => {
 
 // --- WebRTC LOGIC ---
 
-// NEW STABLE CONFIG
 const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -217,26 +216,27 @@ socket.on('signal', async (data) => {
         myPeerConnection.ontrack = (event) => {
             const audioEl = document.getElementById('remote-audio');
             
-            // UI & Mobile Security Fixes
+            // MOBILE FIX: Force attributes before assigning stream
+            audioEl.setAttribute('autoplay', 'true');
+            audioEl.setAttribute('playsinline', 'true');
             audioEl.muted = false;      
-            audioEl.autoplay = true; 
-            audioEl.playsInline = true; 
             audioEl.srcObject = event.streams[0];
             
-            const playPromise = audioEl.play();
-            if (playPromise !== undefined) {
-                playPromise.then(() => {
-                    console.log("Audio streaming successfully!");
-                }).catch(error => {
-                    console.warn("Autoplay prevented. Interaction needed.", error);
-                    const list = document.getElementById('attendee-list');
-                    const notice = document.createElement('p');
-                    notice.innerText = "⚠️ Click anywhere to enable audio!";
-                    notice.style.color = "white";
-                    notice.style.fontSize = "0.8rem";
-                    list.prepend(notice);
-                });
-            }
+            // Interaction trigger
+            const handleInteraction = () => {
+                audioEl.play().then(() => {
+                    console.log("Audio playing successfully!");
+                    document.removeEventListener('click', handleInteraction);
+                }).catch(e => console.warn("Retry failed", e));
+            };
+
+            document.addEventListener('click', handleInteraction);
+            
+            // Auto-attempt
+            audioEl.play().catch(error => {
+                console.warn("Autoplay blocked. User needs to click.");
+                statusText.innerText = "⚠️ CLICK SCREEN TO ENABLE AUDIO";
+            });
         };
 
         myPeerConnection.onicecandidate = (event) => {
