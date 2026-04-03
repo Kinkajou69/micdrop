@@ -194,7 +194,6 @@ mediaRecorder = { stop: () => { processor.disconnect(); source.disconnect(); sen
 console.log("PCM streaming started ✅");
 
         // Fire every 250ms — low latency chunks
-        mediaRecorder.start(250);
         console.log("MediaRecorder started ✅");
 
     } catch (err) {
