@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MicDrop Conference</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="bg-orb orb-1"></div>
+<div class="bg-orb orb-2"></div>
+
+    <div class="glass-container">
+        <header>
+            <h1>MicDrop</h1>
+            <div id="status-bar" class="hidden">
+                Room: <span id="room-display"></span> | <span id="role-display"></span>
+            </div>
+        </header>
+
+        <div id="view-landing" class="view">
+            <button id="btn-start" class="primary-btn">Start Conference (Host)</button>
+            <button id="btn-join" class="secondary-btn">Join Conference (Guest)</button>
+        </div>
+
+        <div id="view-join" class="view hidden">
+            <input type="text" id="input-name" placeholder="Your Display Name" />
+            <input type="text" id="input-code" placeholder="Conference Code (6 chars)" maxlength="6" />
+            <button id="btn-enter" class="primary-btn">Enter Room</button>
+            <button id="btn-back" class="text-btn">Back</button>
+        </div>
+
+        <div id="view-moderator" class="view hidden">
+            <h3>Live Attendees</h3>
+            <div id="attendee-list" class="list-container">
+                </div>
+            <audio id="remote-audio" autoplay></audio>
+        </div>
+
+        <div id="view-attendee" class="view hidden">
+            <div class="status-card">
+                <p id="attendee-status-text">Ready to ask a question?</p>
+                <div id="timer-display" class="hidden">30s</div>
+            </div>
+            
+            <button id="btn-raise-hand" class="primary-btn pulse-btn">✋ Raise Hand</button>
+            <button id="btn-stop-talking" class="danger-btn hidden">Microphone Active (Click to Stop)</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
