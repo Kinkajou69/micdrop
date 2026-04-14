@@ -78,6 +78,10 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('audio_chunk', (data) => {
+        io.to(data.targetId).emit('audio_chunk', data);
+    });
+
     socket.on('signal', (data) => {
         io.to(data.target).emit('signal', {
             sender: socket.id,

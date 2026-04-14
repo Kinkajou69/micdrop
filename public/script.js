@@ -135,16 +135,6 @@ document.getElementById('btn-enter').onclick = async () => {
     }
 };
 
-// --- Bouncy Animations + Sound Trigger ---
-document.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('click', function() {
-        playClick();
-        this.classList.remove('bouncy-active');
-        void this.offsetWidth; // Trigger reflow
-        this.classList.add('bouncy-active');
-    });
-});
-
 // Hamburger Toggle
 navTrigger.onclick = () => sideNav.classList.toggle('active');
 
@@ -158,6 +148,11 @@ socket.on('room_created', (code) => {
     document.getElementById('role-display').innerText = 'HOST';
     document.getElementById('status-bar').classList.remove('hidden');
     showView('moderator');
+});
+
+socket.on('error_msg', (msg) => {
+    alert(msg);
+    location.reload();
 });
 
 socket.on('joined_success', (data) => {
@@ -202,9 +197,13 @@ window.rejectSpeaker = (id) => {
 
 // --- PCM Audio Streaming Logic (Restored) ---
 
+let chunksSent = 0;
+let chunksReceived = 0;
+
 socket.on('mic_approved', async (data) => {
     if (mediaRecorder) return;
     if (data.moderatorId) currentModeratorId = data.moderatorId;
+    console.log('[MicDrop] mic_approved — streaming to moderator:', currentModeratorId);
     statusText.innerText = "You are LIVE! 🎙️";
     btnStop.classList.remove('hidden');
 
@@ -213,6 +212,7 @@ socket.on('mic_approved', async (data) => {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
         const senderContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        console.log('[MicDrop] senderContext sample rate:', senderContext.sampleRate);
         const source = senderContext.createMediaStreamSource(localStream);
         const processor = senderContext.createScriptProcessor(4096, 1, 1);
 
@@ -225,6 +225,10 @@ socket.on('mic_approved', async (data) => {
             for (let i = 0; i < float32.length; i++) {
                 int16[i] = Math.max(-32768, Math.min(32767, float32[i] * 32768));
             }
+            chunksSent++;
+            if (chunksSent <= 3 || chunksSent % 50 === 0) {
+                console.log('[MicDrop] sending chunk #' + chunksSent, 'samples:', int16.length, 'to:', currentModeratorId);
+            }
             socket.emit('audio_chunk', {
                 targetId: currentModeratorId,
                 buffer: int16.buffer
@@ -234,22 +238,33 @@ socket.on('mic_approved', async (data) => {
             stop: () => { processor.disconnect(); source.disconnect(); senderContext.close(); }
         };
     } catch (err) {
+        console.error("Streaming error:", err);
+        alert("Could not start audio stream.");
         stopStreaming();
     }
 });
 
 socket.on('audio_chunk', async (data) => {
     if (myRole !== 'moderator') return;
+    chunksReceived++;
+    if (chunksReceived <= 3 || chunksReceived % 50 === 0) {
+        console.log('[MicDrop] received chunk #' + chunksReceived, 'audioCtx state:', audioContext?.state, 'buffer type:', data.buffer?.constructor?.name, 'byteLength:', data.buffer?.byteLength);
+    }
     if (!audioContext || audioContext.state === 'suspended') {
+        console.warn('[MicDrop] AudioContext suspended — showing audio gate');
         if (audioGate) audioGate.classList.remove('hidden');
         return;
     }
-    const int16 = new Int16Array(data.buffer);
-    const audioBuffer = audioContext.createBuffer(1, int16.length, 16000);
-    const channel = audioBuffer.getChannelData(0);
-    for (let i = 0; i < int16.length; i++) { channel[i] = int16[i] / 32768; }
-    audioQueue.push(audioBuffer);
-    if (!isPlaying) playNextChunk();
+    try {
+        const int16 = new Int16Array(data.buffer);
+        const audioBuffer = audioContext.createBuffer(1, int16.length, 16000);
+        const channel = audioBuffer.getChannelData(0);
+        for (let i = 0; i < int16.length; i++) { channel[i] = int16[i] / 32768; }
+        audioQueue.push(audioBuffer);
+        if (!isPlaying) playNextChunk();
+    } catch (err) {
+        console.error('[MicDrop] Error decoding audio chunk:', err, data);
+    }
 });
 
 function playNextChunk() {
