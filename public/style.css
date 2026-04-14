@@ -154,6 +154,25 @@ h1 {
 }
 .glass-nav.active { right: 0; }
 
+.nav-credit {
+    position: absolute;
+    bottom: 40px;
+    left: 30px;
+    opacity: 0.5;
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+.nav-credit-name {
+    font-family: "Rajdhani";
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--cyan);
+    opacity: 1;
+    margin-top: 2px;
+}
+
 .mic-status-pill {
     display: flex;
     align-items: center;
