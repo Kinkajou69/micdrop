@@ -135,16 +135,6 @@ document.getElementById('btn-enter').onclick = async () => {
     }
 };
 
-// --- Bouncy Animations + Sound Trigger ---
-document.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('click', function() {
-        playClick();
-        this.classList.remove('bouncy-active');
-        void this.offsetWidth; // Trigger reflow
-        this.classList.add('bouncy-active');
-    });
-});
-
 // Hamburger Toggle
 navTrigger.onclick = () => sideNav.classList.toggle('active');
 
@@ -158,6 +148,11 @@ socket.on('room_created', (code) => {
     document.getElementById('role-display').innerText = 'HOST';
     document.getElementById('status-bar').classList.remove('hidden');
     showView('moderator');
+});
+
+socket.on('error_msg', (msg) => {
+    alert(msg);
+    location.reload();
 });
 
 socket.on('joined_success', (data) => {
@@ -234,6 +229,8 @@ socket.on('mic_approved', async (data) => {
             stop: () => { processor.disconnect(); source.disconnect(); senderContext.close(); }
         };
     } catch (err) {
+        console.error("Streaming error:", err);
+        alert("Could not start audio stream.");
         stopStreaming();
     }
 });
