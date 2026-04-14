@@ -65,6 +65,8 @@
             <h3>Live Attendees</h3>
             <div id="attendee-list" class="list-container"></div>
             <audio id="remote-audio" autoplay playsinline></audio>
+            <div id="qr-code"></div>
+            <p class="qr-label">Scan to join</p>
         </div>
 
         <div id="view-attendee" class="view hidden">
@@ -76,6 +78,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
     (function () {
@@ -240,9 +243,17 @@
         }
         render();
 
-        window.addEventListener('resize', () => {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        function onResize() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            renderer.setSize(w, h);
+            material.uniforms.uResolution.value.set(w, h);
+        }
+        window.addEventListener('resize', onResize);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', onResize);
+            window.visualViewport.addEventListener('scroll', syncGlass);
+        }
     })();
     </script>
     <script src="script.js"></script>
