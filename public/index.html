@@ -246,5 +246,44 @@
     })();
     </script>
     <script src="script.js"></script>
+
+    <body>
+
+    <div id="bg"></div>
+    <canvas id="gl"></canvas>
+    
+    <div class="grain"></div>
+    <div class="ambient-glow"></div>
+
+    <div class="glass-container" id="main-card">
+        <header>
+            <h1>MicDrop</h1>
+            
+            <div class="waveform">
+                <span></span><span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span><span></span>
+            </div>
+
+            <div id="status-bar" class="hidden">
+                <span id="room-display"></span> | <span id="role-display"></span>
+            </div>
+        </header>
+
+        <div id="view-landing" class="view fade-in-up">
+            <button id="btn-start" class="primary-btn bouncy">Start Conference (Host)</button>
+            <button id="btn-join" class="secondary-btn bouncy">Join Conference (Guest)</button>
+        </div>
+
+        <div id="view-join" class="view hidden fade-in-up">
+            </div>
+
+        <div id="view-moderator" class="view hidden fade-in-up">
+            </div>
+
+        <div id="view-attendee" class="view hidden fade-in-up">
+            </div>
+    </div>
+
+    ```
 </body>
 </html>
