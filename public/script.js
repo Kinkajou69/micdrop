@@ -97,27 +97,21 @@ if (unlockBtn) {
     };
 }
 
-// --- Mic Warm-Up ---
-async function warmUpAudio() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        localStream = stream;
-        console.log("Mic access granted ✅");
-        updateMicUI('on');
-        return true;
-    } catch (err) {
-        console.error("Mic access denied:", err);
-        updateMicUI('off');
-        alert("Microphone access is required.");
-        return false;
-    }
-}
-
 // --- Button Listeners ---
 document.getElementById('btn-start').onclick = async () => {
     unlockAudioContext();
-    const ready = await warmUpAudio();
-    if (ready) socket.emit('create_room');
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("Mic access granted ✅");
+        updateMicUI('on');
+        socket.emit('create_room');
+    } catch (err) {
+        console.error("Mic access denied:", err);
+        updateMicUI('off');
+        alert(err.name === 'NotAllowedError'
+            ? "Microphone access was denied. Please allow mic access in your browser settings and try again."
+            : "Could not access microphone: " + err.message);
+    }
 };
 
 document.getElementById('btn-join').onclick = () => showView('join');
@@ -126,14 +120,28 @@ document.getElementById('btn-back').onclick = () => showView('landing');
 document.getElementById('btn-enter').onclick = async () => {
     const name = document.getElementById('input-name').value.trim();
     const code = document.getElementById('input-code').value.toUpperCase().trim();
-    if (name && code) {
-        unlockAudioContext();
-        const ready = await warmUpAudio();
-        if (ready) socket.emit('join_room', { code, name });
-    } else {
-        alert("Please fill in both fields.");
+    if (!name || !code) { alert("Please fill in both fields."); return; }
+    unlockAudioContext();
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("Mic access granted ✅");
+        updateMicUI('on');
+        socket.emit('join_room', { code, name });
+    } catch (err) {
+        console.error("Mic access denied:", err);
+        updateMicUI('off');
+        alert(err.name === 'NotAllowedError'
+            ? "Microphone access was denied. Please allow mic access in your browser settings and try again."
+            : "Could not access microphone: " + err.message);
     }
 };
+
+// Pre-fill join code if arriving via QR link (?code=XXXXXX)
+const _urlCode = new URLSearchParams(window.location.search).get('code');
+if (_urlCode) {
+    document.getElementById('input-code').value = _urlCode;
+    showView('join');
+}
 
 // Hamburger Toggle
 navTrigger.onclick = () => sideNav.classList.toggle('active');
@@ -147,6 +155,15 @@ socket.on('room_created', (code) => {
     document.getElementById('room-display').innerText = code;
     document.getElementById('role-display').innerText = 'HOST';
     document.getElementById('status-bar').classList.remove('hidden');
+    const qrContainer = document.getElementById('qr-code');
+    qrContainer.innerHTML = '';
+    new QRCode(qrContainer, {
+        text: window.location.origin + '/?code=' + code,
+        width: 120,
+        height: 120,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+    });
     showView('moderator');
 });
 
@@ -170,19 +187,37 @@ socket.on('update_attendees', (attendees) => {
     if (myRole !== 'moderator') return;
     const list = document.getElementById('attendee-list');
     list.innerHTML = '';
-    attendees.sort((a, b) => (b.handRaised === true) - (a.handRaised === true));
+    const anyoneSpeaking = attendees.some(a => a.isSpeaking);
+    attendees.sort((a, b) => (b.isSpeaking === true) - (a.isSpeaking === true) || (b.handRaised === true) - (a.handRaised === true));
     attendees.forEach(att => {
         const div = document.createElement('div');
-        div.className = `attendee-item ${att.handRaised ? 'hand-raised' : ''}`;
-        let controls = att.handRaised
-            ? `<div class="mod-controls">
-                <button class="primary-btn" onclick="approveSpeaker('${att.id}')">✅ Speak</button>
-                <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">❌ Deny</button>
-               </div>`
-            : `<span style="font-size:0.8rem; opacity:0.6; margin-right:10px">Listening</span>`;
+        div.className = `attendee-item ${att.isSpeaking ? 'speaking' : att.handRaised ? 'hand-raised' : ''}`;
+        let controls;
+        if (att.isSpeaking) {
+            controls = `<div class="mod-controls">
+                <span class="speaking-badge">🎙️ LIVE</span>
+                <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">Cut Off</button>
+            </div>`;
+        } else if (att.handRaised) {
+            controls = anyoneSpeaking
+                ? `<div class="mod-controls">
+                    <button class="primary-btn" disabled>⏳ Wait</button>
+                    <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">❌ Deny</button>
+                   </div>`
+                : `<div class="mod-controls">
+                    <button class="primary-btn" onclick="approveSpeaker('${att.id}')">✅ Speak</button>
+                    <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">❌ Deny</button>
+                   </div>`;
+        } else {
+            controls = `<span style="font-size:0.8rem; opacity:0.6; margin-right:10px">Listening</span>`;
+        }
         div.innerHTML = `<span>${att.name}</span>${controls}`;
         list.appendChild(div);
     });
+});
+
+socket.on('speaker_busy', () => {
+    alert("Someone is already speaking. Cut them off first.");
 });
 
 window.approveSpeaker = (id) => {
