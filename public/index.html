@@ -18,7 +18,7 @@
         <div class="hamburger-bar"></div>
     </div>
 
-    <div id="side-nav" class="glass-nav hidden">
+    <div id="side-nav" class="glass-nav">
         <div class="nav-content">
             <div class="status-panel">
                 <h3>SYSTEM STATUS</h3>
@@ -30,6 +30,10 @@
             <div class="nav-links">
                 <p>MicDrop v1.2</p>
                 <button class="text-btn" onclick="location.reload()">Reset Session</button>
+            </div>
+            <div class="nav-credit">
+                <p>Developed by</p>
+                <p class="nav-credit-name">Reyansh Sawant</p>
             </div>
         </div>
     </div>
@@ -65,6 +69,8 @@
             <h3>Live Attendees</h3>
             <div id="attendee-list" class="list-container"></div>
             <audio id="remote-audio" autoplay playsinline></audio>
+            <div id="qr-code"></div>
+            <p class="qr-label">Scan to join</p>
         </div>
 
         <div id="view-attendee" class="view hidden">
@@ -76,6 +82,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
     (function () {
@@ -240,9 +247,17 @@
         }
         render();
 
-        window.addEventListener('resize', () => {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        function onResize() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            renderer.setSize(w, h);
+            material.uniforms.uResolution.value.set(w, h);
+        }
+        window.addEventListener('resize', onResize);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', onResize);
+            window.visualViewport.addEventListener('scroll', syncGlass);
+        }
     })();
     </script>
     <script src="script.js"></script>

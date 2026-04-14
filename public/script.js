@@ -97,27 +97,21 @@ if (unlockBtn) {
     };
 }
 
-// --- Mic Warm-Up ---
-async function warmUpAudio() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        localStream = stream;
-        console.log("Mic access granted ✅");
-        updateMicUI('on');
-        return true;
-    } catch (err) {
-        console.error("Mic access denied:", err);
-        updateMicUI('off');
-        alert("Microphone access is required.");
-        return false;
-    }
-}
-
 // --- Button Listeners ---
 document.getElementById('btn-start').onclick = async () => {
     unlockAudioContext();
-    const ready = await warmUpAudio();
-    if (ready) socket.emit('create_room');
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("Mic access granted ✅");
+        updateMicUI('on');
+        socket.emit('create_room');
+    } catch (err) {
+        console.error("Mic access denied:", err);
+        updateMicUI('off');
+        alert(err.name === 'NotAllowedError'
+            ? "Microphone access was denied. Please allow mic access in your browser settings and try again."
+            : "Could not access microphone: " + err.message);
+    }
 };
 
 document.getElementById('btn-join').onclick = () => showView('join');
@@ -126,24 +120,28 @@ document.getElementById('btn-back').onclick = () => showView('landing');
 document.getElementById('btn-enter').onclick = async () => {
     const name = document.getElementById('input-name').value.trim();
     const code = document.getElementById('input-code').value.toUpperCase().trim();
-    if (name && code) {
-        unlockAudioContext();
-        const ready = await warmUpAudio();
-        if (ready) socket.emit('join_room', { code, name });
-    } else {
-        alert("Please fill in both fields.");
+    if (!name || !code) { alert("Please fill in both fields."); return; }
+    unlockAudioContext();
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("Mic access granted ✅");
+        updateMicUI('on');
+        socket.emit('join_room', { code, name });
+    } catch (err) {
+        console.error("Mic access denied:", err);
+        updateMicUI('off');
+        alert(err.name === 'NotAllowedError'
+            ? "Microphone access was denied. Please allow mic access in your browser settings and try again."
+            : "Could not access microphone: " + err.message);
     }
 };
 
-// --- Bouncy Animations + Sound Trigger ---
-document.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('click', function() {
-        playClick();
-        this.classList.remove('bouncy-active');
-        void this.offsetWidth; // Trigger reflow
-        this.classList.add('bouncy-active');
-    });
-});
+// Pre-fill join code if arriving via QR link (?code=XXXXXX)
+const _urlCode = new URLSearchParams(window.location.search).get('code');
+if (_urlCode) {
+    document.getElementById('input-code').value = _urlCode;
+    showView('join');
+}
 
 // Hamburger Toggle
 navTrigger.onclick = () => sideNav.classList.toggle('active');
@@ -157,7 +155,21 @@ socket.on('room_created', (code) => {
     document.getElementById('room-display').innerText = code;
     document.getElementById('role-display').innerText = 'HOST';
     document.getElementById('status-bar').classList.remove('hidden');
+    const qrContainer = document.getElementById('qr-code');
+    qrContainer.innerHTML = '';
+    new QRCode(qrContainer, {
+        text: window.location.origin + '/?code=' + code,
+        width: 120,
+        height: 120,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+    });
     showView('moderator');
+});
+
+socket.on('error_msg', (msg) => {
+    alert(msg);
+    location.reload();
 });
 
 socket.on('joined_success', (data) => {
@@ -175,19 +187,37 @@ socket.on('update_attendees', (attendees) => {
     if (myRole !== 'moderator') return;
     const list = document.getElementById('attendee-list');
     list.innerHTML = '';
-    attendees.sort((a, b) => (b.handRaised === true) - (a.handRaised === true));
+    const anyoneSpeaking = attendees.some(a => a.isSpeaking);
+    attendees.sort((a, b) => (b.isSpeaking === true) - (a.isSpeaking === true) || (b.handRaised === true) - (a.handRaised === true));
     attendees.forEach(att => {
         const div = document.createElement('div');
-        div.className = `attendee-item ${att.handRaised ? 'hand-raised' : ''}`;
-        let controls = att.handRaised
-            ? `<div class="mod-controls">
-                <button class="primary-btn" onclick="approveSpeaker('${att.id}')">✅ Speak</button>
-                <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">❌ Deny</button>
-               </div>`
-            : `<span style="font-size:0.8rem; opacity:0.6; margin-right:10px">Listening</span>`;
+        div.className = `attendee-item ${att.isSpeaking ? 'speaking' : att.handRaised ? 'hand-raised' : ''}`;
+        let controls;
+        if (att.isSpeaking) {
+            controls = `<div class="mod-controls">
+                <span class="speaking-badge">🎙️ LIVE</span>
+                <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">Cut Off</button>
+            </div>`;
+        } else if (att.handRaised) {
+            controls = anyoneSpeaking
+                ? `<div class="mod-controls">
+                    <button class="primary-btn" disabled>⏳ Wait</button>
+                    <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">❌ Deny</button>
+                   </div>`
+                : `<div class="mod-controls">
+                    <button class="primary-btn" onclick="approveSpeaker('${att.id}')">✅ Speak</button>
+                    <button class="danger-btn" onclick="rejectSpeaker('${att.id}')">❌ Deny</button>
+                   </div>`;
+        } else {
+            controls = `<span style="font-size:0.8rem; opacity:0.6; margin-right:10px">Listening</span>`;
+        }
         div.innerHTML = `<span>${att.name}</span>${controls}`;
         list.appendChild(div);
     });
+});
+
+socket.on('speaker_busy', () => {
+    alert("Someone is already speaking. Cut them off first.");
 });
 
 window.approveSpeaker = (id) => {
@@ -202,9 +232,13 @@ window.rejectSpeaker = (id) => {
 
 // --- PCM Audio Streaming Logic (Restored) ---
 
+let chunksSent = 0;
+let chunksReceived = 0;
+
 socket.on('mic_approved', async (data) => {
     if (mediaRecorder) return;
     if (data.moderatorId) currentModeratorId = data.moderatorId;
+    console.log('[MicDrop] mic_approved — streaming to moderator:', currentModeratorId);
     statusText.innerText = "You are LIVE! 🎙️";
     btnStop.classList.remove('hidden');
 
@@ -213,6 +247,7 @@ socket.on('mic_approved', async (data) => {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
         const senderContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        console.log('[MicDrop] senderContext sample rate:', senderContext.sampleRate);
         const source = senderContext.createMediaStreamSource(localStream);
         const processor = senderContext.createScriptProcessor(4096, 1, 1);
 
@@ -225,6 +260,10 @@ socket.on('mic_approved', async (data) => {
             for (let i = 0; i < float32.length; i++) {
                 int16[i] = Math.max(-32768, Math.min(32767, float32[i] * 32768));
             }
+            chunksSent++;
+            if (chunksSent <= 3 || chunksSent % 50 === 0) {
+                console.log('[MicDrop] sending chunk #' + chunksSent, 'samples:', int16.length, 'to:', currentModeratorId);
+            }
             socket.emit('audio_chunk', {
                 targetId: currentModeratorId,
                 buffer: int16.buffer
@@ -234,22 +273,33 @@ socket.on('mic_approved', async (data) => {
             stop: () => { processor.disconnect(); source.disconnect(); senderContext.close(); }
         };
     } catch (err) {
+        console.error("Streaming error:", err);
+        alert("Could not start audio stream.");
         stopStreaming();
     }
 });
 
 socket.on('audio_chunk', async (data) => {
     if (myRole !== 'moderator') return;
+    chunksReceived++;
+    if (chunksReceived <= 3 || chunksReceived % 50 === 0) {
+        console.log('[MicDrop] received chunk #' + chunksReceived, 'audioCtx state:', audioContext?.state, 'buffer type:', data.buffer?.constructor?.name, 'byteLength:', data.buffer?.byteLength);
+    }
     if (!audioContext || audioContext.state === 'suspended') {
+        console.warn('[MicDrop] AudioContext suspended — showing audio gate');
         if (audioGate) audioGate.classList.remove('hidden');
         return;
     }
-    const int16 = new Int16Array(data.buffer);
-    const audioBuffer = audioContext.createBuffer(1, int16.length, 16000);
-    const channel = audioBuffer.getChannelData(0);
-    for (let i = 0; i < int16.length; i++) { channel[i] = int16[i] / 32768; }
-    audioQueue.push(audioBuffer);
-    if (!isPlaying) playNextChunk();
+    try {
+        const int16 = new Int16Array(data.buffer);
+        const audioBuffer = audioContext.createBuffer(1, int16.length, 16000);
+        const channel = audioBuffer.getChannelData(0);
+        for (let i = 0; i < int16.length; i++) { channel[i] = int16[i] / 32768; }
+        audioQueue.push(audioBuffer);
+        if (!isPlaying) playNextChunk();
+    } catch (err) {
+        console.error('[MicDrop] Error decoding audio chunk:', err, data);
+    }
 });
 
 function playNextChunk() {

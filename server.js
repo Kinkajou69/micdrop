@@ -17,7 +17,8 @@ io.on('connection', (socket) => {
         const code = generateCode();
         rooms[code] = {
             moderatorId: socket.id,
-            attendees: []
+            attendees: [],
+            currentSpeaker: null
         };
         socket.join(code);
         socket.emit('room_created', code);
@@ -57,8 +58,10 @@ io.on('connection', (socket) => {
             const attendee = room.attendees.find(a => a.id === socket.id);
             if (attendee) {
                 attendee.handRaised = false;
-                io.to(room.moderatorId).emit('update_attendees', room.attendees);
+                attendee.isSpeaking = false;
             }
+            if (room.currentSpeaker === socket.id) room.currentSpeaker = null;
+            io.to(room.moderatorId).emit('update_attendees', room.attendees);
         }
     });
 
@@ -70,12 +73,25 @@ io.on('connection', (socket) => {
             io.to(targetId).emit('mic_stopped');
             io.to(targetId).emit('hand_rejected');
             const attendee = room.attendees.find(a => a.id === targetId);
-            if (attendee) attendee.handRaised = false;
+            if (attendee) { attendee.handRaised = false; attendee.isSpeaking = false; }
+            if (room.currentSpeaker === targetId) room.currentSpeaker = null;
             io.to(room.moderatorId).emit('update_attendees', room.attendees);
         }
         else if (action === 'approve') {
+            if (room.currentSpeaker) {
+                socket.emit('speaker_busy');
+                return;
+            }
+            room.currentSpeaker = targetId;
+            const attendee = room.attendees.find(a => a.id === targetId);
+            if (attendee) { attendee.handRaised = false; attendee.isSpeaking = true; }
             io.to(targetId).emit('mic_approved', { moderatorId: room.moderatorId });
+            io.to(room.moderatorId).emit('update_attendees', room.attendees);
         }
+    });
+
+    socket.on('audio_chunk', (data) => {
+        io.to(data.targetId).emit('audio_chunk', data);
     });
 
     socket.on('signal', (data) => {
@@ -95,6 +111,7 @@ io.on('connection', (socket) => {
             } else {
                 const index = room.attendees.findIndex(a => a.id === socket.id);
                 if (index !== -1) {
+                    if (room.currentSpeaker === socket.id) room.currentSpeaker = null;
                     room.attendees.splice(index, 1);
                     io.to(room.moderatorId).emit('update_attendees', room.attendees);
                 }
